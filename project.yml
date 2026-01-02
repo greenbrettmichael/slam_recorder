@@ -1,3 +1,4 @@
+name: SLAMRecorder
 targets:
   SLAMRecorder:
     type: application
