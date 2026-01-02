@@ -1,26 +1,31 @@
-name: SLAMRecorder
-options:
-  bundleIdPrefix: com.brett
 targets:
   SLAMRecorder:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: SLAMRecorder # This assumes your swift files are in a subfolder named 'SLAMRecorder'
+      - path: SLAMRecorder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brett.SLAMRecorder
         MARKETING_VERSION: 1.0
         CURRENT_PROJECT_VERSION: 1
     info:
-      path: SLAMRecorder/Info.plist # We will create this physically next
+      path: SLAMRecorder/Info.plist
       properties:
         CFBundleShortVersionString: "1.0"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
-        # CRITICAL ARKIT PERMISSIONS
         NSCameraUsageDescription: "Camera access is required for ARKit tracking."
         NSPhotoLibraryAddUsageDescription: "Required to save recorded sessions."
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+
+  SLAMRecorderTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: SLAMRecorderTests
+    dependencies:
+      - target: SLAMRecorder
