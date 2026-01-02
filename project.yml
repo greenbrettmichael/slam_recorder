@@ -30,3 +30,6 @@ targets:
       - path: SLAMRecorderTests
     dependencies:
       - target: SLAMRecorder
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      PRODUCT_BUNDLE_IDENTIFIER: com.brett.SLAMRecorderTests
