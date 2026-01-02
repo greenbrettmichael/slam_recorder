@@ -32,3 +32,7 @@ buildServer.json
 session_*/
 *.csv
 *.jpg
+
+# Environment files
+.env
+.envrc
