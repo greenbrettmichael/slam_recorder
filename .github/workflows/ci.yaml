@@ -29,12 +29,9 @@ jobs:
       - name: Generate Project
         run: xcodegen generate
 
-      - name: Pre-boot Simulator
-        run: |
-          xcrun simctl boot "iPhone SE (3rd generation)" || true
-
       - name: Build and Test
         run: |
+          xcrun simctl boot "iPhone SE (3rd generation)" &
           xcodebuild test \
             -project SLAMRecorder.xcodeproj \
             -scheme SLAMRecorder \
