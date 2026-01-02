@@ -9,11 +9,19 @@ on:
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: macos-latest
+    runs-on: macos-15
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Cache Build
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-derived-data-${{ hashFiles('**/SLAMRecorder/**/*.swift', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-derived-data-
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -21,12 +29,15 @@ jobs:
       - name: Generate Project
         run: xcodegen generate
 
+      - name: Pre-boot Simulator
+        run: |
+          xcrun simctl boot "iPhone SE (3rd generation)" || true
+
       - name: Build and Test
-        # REMOVED: -clean (Not needed on CI, and caused the syntax error)
         run: |
           xcodebuild test \
             -project SLAMRecorder.xcodeproj \
             -scheme SLAMRecorder \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
