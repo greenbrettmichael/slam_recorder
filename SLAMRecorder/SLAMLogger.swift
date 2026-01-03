@@ -15,6 +15,12 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     /// Indicates whether recording is currently active.
     @Published var isRecording = false
     
+    /// Determines whether we are recording ARKit or a multi-camera session.
+    @Published var recordingMode: RecordingMode = .arkit
+    
+    /// Selected cameras when using multi-camera recording.
+    @Published var selectedCameras: Set<CameraID> = [.backWide, .front]
+    
     /// The number of video frames captured in the current session.
     @Published var sampleCount = 0
     
@@ -26,12 +32,20 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     private var imuWriter: CSVWriter?
     private var poseWriter: CSVWriter?
     private let videoRecorder = VideoRecorder()
+    private let multiCamRecorder: MultiCamRecording
     
     private var recordingURL: URL?
     
     // MARK: - Initialization
     
-    override init() {
+    init(multiCamRecorder: MultiCamRecording = {
+        if #available(iOS 13.0, *) {
+            return MultiCamRecorder()
+        } else {
+            return NoopMultiCamRecorder()
+        }
+    }()) {
+        self.multiCamRecorder = multiCamRecorder
         super.init()
         // Configure the session hosted by the view
         sceneView.session.delegate = self
@@ -43,8 +57,17 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     /// Starts the AR session monitoring.
     /// This should be called when the view appears.
     func startMonitoring() {
+        guard recordingMode == .arkit else {
+            sceneView.session.pause()
+            return
+        }
         let config = ARWorldTrackingConfiguration()
         sceneView.session.run(config, options: [])
+    }
+
+    /// Provides a preview layer for multi-camera mode if available.
+    func multiCamPreviewLayer() -> AVCaptureVideoPreviewLayer? {
+        return multiCamRecorder.makePreviewLayer()
     }
     
     /// Starts a new recording session.
@@ -54,8 +77,21 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         
         if setupFiles() {
             startIMU()
-            isRecording = true
-            sampleCount = 0
+            switch recordingMode {
+            case .arkit:
+                isRecording = true
+                sampleCount = 0
+            case .multiCamera:
+                guard let dir = recordingURL else { return }
+                let success = multiCamRecorder.startRecording(cameras: selectedCameras, directory: dir)
+                isRecording = success
+                if !success {
+                    print("Multi-camera recording not supported or failed to start.")
+                    motionManager.stopDeviceMotionUpdates()
+                    imuWriter?.close()
+                    imuWriter = nil
+                }
+            }
         } else {
             print("Failed to setup files for recording.")
         }
@@ -75,9 +111,13 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         imuWriter = nil
         poseWriter = nil
         
-        // Finish Video
-        videoRecorder.finish {
-            print("Video recording finished.")
+        switch recordingMode {
+        case .arkit:
+            videoRecorder.finish {
+                print("Video recording finished.")
+            }
+        case .multiCamera:
+            multiCamRecorder.stopRecording()
         }
     }
     
@@ -99,12 +139,16 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
             
             // Setup CSV Writers
             let imuURL = sessionDir.appendingPathComponent("imu_data.csv")
-            let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
-            
             imuWriter = CSVWriter(url: imuURL, header: "timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\n")
-            poseWriter = CSVWriter(url: poseURL, header: "timestamp,tx,ty,tz,qx,qy,qz,qw\n")
             
-            return imuWriter != nil && poseWriter != nil
+            if recordingMode == .arkit {
+                let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
+                poseWriter = CSVWriter(url: poseURL, header: "timestamp,tx,ty,tz,qx,qy,qz,qw\n")
+            } else {
+                poseWriter = nil
+            }
+            
+            return imuWriter != nil && (recordingMode == .multiCamera || poseWriter != nil)
         } catch {
             print("Error creating session directory: \(error)")
             return false
@@ -135,7 +179,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - ARSessionDelegate
     
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        guard isRecording, let dir = recordingURL else { return }
+        guard isRecording, recordingMode == .arkit, let dir = recordingURL else { return }
         
         // Log Pose
         let tf = frame.camera.transform

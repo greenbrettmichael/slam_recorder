@@ -11,6 +11,7 @@ class VideoRecorder {
     private var videoInput: AVAssetWriterInput?
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var isSessionStarted = false
+    private var preferredStartTime: CMTime?
     
     /// Checks if the recorder is currently in a writing state.
     var isWriting: Bool {
@@ -52,6 +53,11 @@ class VideoRecorder {
         
         return false
     }
+
+    /// Sets a desired session start time that will be used when the first frame arrives.
+    func setPreferredStartTime(_ time: CMTime) {
+        preferredStartTime = time
+    }
     
     /// Appends a frame to the video.
     /// - Parameters:
@@ -65,7 +71,7 @@ class VideoRecorder {
         let cmTime = CMTime(seconds: timestamp, preferredTimescale: 600)
         
         if !isSessionStarted {
-            writer.startSession(atSourceTime: cmTime)
+            writer.startSession(atSourceTime: preferredStartTime ?? cmTime)
             isSessionStarted = true
         }
         
@@ -86,6 +92,7 @@ class VideoRecorder {
             self?.videoInput = nil
             self?.pixelBufferAdaptor = nil
             self?.isSessionStarted = false
+            self?.preferredStartTime = nil
             completion()
         }
     }

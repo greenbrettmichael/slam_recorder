@@ -39,9 +39,10 @@ def extract_frames(video_path, output_folder):
 
     stream = container.streams.video[0]
     
-    # Try to find the start time offset
+    # Try to find the shared start time offset for the session.
     video_dir = os.path.dirname(video_path)
     start_time_path = os.path.join(video_dir, "video_start_time.txt")
+
     start_offset = 0.0
     
     if os.path.exists(start_time_path):
@@ -51,9 +52,9 @@ def extract_frames(video_path, output_folder):
                 start_offset = float(content)
             print(f"Found start time offset: {start_offset}")
         except ValueError:
-            print("Warning: Could not parse video_start_time.txt")
+            print(f"Warning: Could not parse {os.path.basename(start_time_path)}")
     else:
-        print("Warning: video_start_time.txt not found. Timestamps will be relative to 0.")
+        print(f"Warning: {os.path.basename(start_time_path)} not found. Timestamps will be relative to 0.")
 
     # Prepare CSV to link filename -> timestamp
     csv_path = os.path.join(output_folder, "frame_timestamps.csv")

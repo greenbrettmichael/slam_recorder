@@ -1,13 +1,16 @@
 import XCTest
 @testable import SLAMRecorder
+import AVFoundation
 
 final class SLAMLoggerTests: XCTestCase {
     
     var logger: SLAMLogger!
+    var mockMultiCam: MockMultiCamRecorder!
 
     override func setUp() {
         super.setUp()
-        logger = SLAMLogger()
+        mockMultiCam = MockMultiCamRecorder()
+        logger = SLAMLogger(multiCamRecorder: mockMultiCam)
     }
 
     override func tearDown() {
@@ -16,6 +19,15 @@ final class SLAMLoggerTests: XCTestCase {
         }
         logger = nil
         super.tearDown()
+    }
+
+    func testMultiCamModeSkipsPoseWriter() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertTrue(mockMultiCam.startCalled)
+        XCTAssertEqual(mockMultiCam.lastCameras, [.backWide])
+        logger.stopRecording()
     }
 
     func testInitialState() {
@@ -77,5 +89,31 @@ final class SLAMLoggerTests: XCTestCase {
         } catch {
             XCTFail("Failed to list directories: \(error)")
         }
+    }
+}
+
+// MARK: - Test Doubles
+
+final class MockMultiCamRecorder: MultiCamRecording {
+    private(set) var startCalled = false
+    private(set) var stopCalled = false
+    private(set) var lastCameras: Set<CameraID> = []
+    private(set) var lastDirectory: URL?
+    var isRecording: Bool = false
+    var shouldStartSucceed: Bool = true
+
+    func makePreviewLayer() -> AVCaptureVideoPreviewLayer? { nil }
+    
+    func startRecording(cameras: Set<CameraID>, directory: URL) -> Bool {
+        startCalled = true
+        lastCameras = cameras
+        lastDirectory = directory
+        isRecording = shouldStartSucceed
+        return shouldStartSucceed
+    }
+    
+    func stopRecording() {
+        stopCalled = true
+        isRecording = false
     }
 }
