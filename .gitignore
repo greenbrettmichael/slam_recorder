@@ -36,3 +36,9 @@ session_*/
 # Environment files
 .env
 .envrc
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

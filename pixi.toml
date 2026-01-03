@@ -1,0 +1,18 @@
+[workspace]
+name = "slam_recorder_tools"
+version = "0.1.0"
+description = "Tools for processing SLAM recorder data"
+authors = ["Brett <brett@bmgvisualtech.com>"]
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tasks]
+extract = "python extract_frames.py"
+test = "pytest"
+
+[dependencies]
+python = "3.11.*"
+av = "*"
+pillow = "*"
+numpy = "*"
+pytest = "*"

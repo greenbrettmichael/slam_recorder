@@ -2,6 +2,7 @@ import ARKit
 import CoreMotion
 import SceneKit
 import SwiftUI
+import AVFoundation
 
 class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // We hold the actual AR View here so we can pass it to the UI
@@ -12,6 +13,12 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     private var imuFileHandle: FileHandle?
     private var poseFileHandle: FileHandle?
     private var recordingURL: URL?
+    
+    // Video Recording
+    private var assetWriter: AVAssetWriter?
+    private var videoInput: AVAssetWriterInput?
+    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var isWriterSessionStarted = false
     
     @Published var isRecording = false
     @Published var sampleCount = 0
@@ -39,6 +46,16 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         isRecording = false
         motionManager.stopDeviceMotionUpdates()
         closeFiles()
+        
+        if let assetWriter = assetWriter, assetWriter.status == .writing {
+            videoInput?.markAsFinished()
+            assetWriter.finishWriting { [weak self] in
+                self?.assetWriter = nil
+                self?.videoInput = nil
+                self?.pixelBufferAdaptor = nil
+                self?.isWriterSessionStarted = false
+            }
+        }
     }
     
     // MARK: - File Setup (Same as before)
@@ -111,22 +128,55 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
             poseFileHandle?.write(bytes)
         }
         
-        self.sampleCount += 1
-        if self.sampleCount % 5 == 0 {
-            saveImage(frame.capturedImage, timestamp: frame.timestamp, dir: dir)
+        // Video Recording
+        if assetWriter == nil {
+            setupVideoWriter(frame: frame, dir: dir)
+            
+            // Save the start timestamp to a separate file for synchronization
+            let startURL = dir.appendingPathComponent("video_start_time.txt")
+            try? String(format: "%.6f", frame.timestamp).write(to: startURL, atomically: true, encoding: .utf8)
+        }
+        
+        if let writer = assetWriter, writer.status == .writing, let input = videoInput, input.isReadyForMoreMediaData {
+            let timestamp = CMTime(seconds: frame.timestamp, preferredTimescale: 600)
+            
+            if !isWriterSessionStarted {
+                writer.startSession(atSourceTime: timestamp)
+                isWriterSessionStarted = true
+            }
+            
+            pixelBufferAdaptor?.append(frame.capturedImage, withPresentationTime: timestamp)
+            self.sampleCount += 1
         }
     }
     
-    private func saveImage(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval, dir: URL) {
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        let context = CIContext()
-        if let cgImage = context.createCGImage(ciImage, from: ciImage.extent) {
-            let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: .right)
-            if let data = uiImage.jpegData(compressionQuality: 0.7) {
-                let filename = String(format: "frame_%.6f.jpg", timestamp)
-                let fileURL = dir.appendingPathComponent(filename)
-                try? data.write(to: fileURL)
-            }
+    private func setupVideoWriter(frame: ARFrame, dir: URL) {
+        let videoURL = dir.appendingPathComponent("video.mov")
+        let width = Int(frame.camera.imageResolution.width)
+        let height = Int(frame.camera.imageResolution.height)
+        
+        do {
+            assetWriter = try AVAssetWriter(outputURL: videoURL, fileType: .mov)
+        } catch {
+            print("Failed to create asset writer: \(error)")
+            return
         }
+        
+        let outputSettings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
+        ]
+        
+        videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+        videoInput?.expectsMediaDataInRealTime = true
+        
+        pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput!, sourcePixelBufferAttributes: nil)
+        
+        if assetWriter?.canAdd(videoInput!) == true {
+            assetWriter?.add(videoInput!)
+        }
+        
+        assetWriter?.startWriting()
     }
 }
