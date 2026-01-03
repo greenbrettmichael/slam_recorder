@@ -4,24 +4,32 @@ import SceneKit
 import SwiftUI
 import AVFoundation
 
+/// The main controller for SLAM data recording.
+/// This class manages the ARSession, captures IMU data, and coordinates writing to CSV and Video files.
 class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
-    // We hold the actual AR View here so we can pass it to the UI
+    // MARK: - Public Properties
+    
+    /// The ARSCNView that hosts the AR session.
     let sceneView = ARSCNView()
+    
+    /// Indicates whether recording is currently active.
+    @Published var isRecording = false
+    
+    /// The number of video frames captured in the current session.
+    @Published var sampleCount = 0
+    
+    // MARK: - Private Properties
+    
     private let motionManager = CMMotionManager()
     
-    // File Handles
-    private var imuFileHandle: FileHandle?
-    private var poseFileHandle: FileHandle?
+    // Helpers
+    private var imuWriter: CSVWriter?
+    private var poseWriter: CSVWriter?
+    private let videoRecorder = VideoRecorder()
+    
     private var recordingURL: URL?
     
-    // Video Recording
-    private var assetWriter: AVAssetWriter?
-    private var videoInput: AVAssetWriterInput?
-    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
-    private var isWriterSessionStarted = false
-    
-    @Published var isRecording = false
-    @Published var sampleCount = 0
+    // MARK: - Initialization
     
     override init() {
         super.init()
@@ -30,66 +38,80 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         sceneView.showsStatistics = true
     }
     
+    // MARK: - Public Methods
+    
+    /// Starts the AR session monitoring.
+    /// This should be called when the view appears.
     func startMonitoring() {
-        // Start ARKit so we can see the camera
         let config = ARWorldTrackingConfiguration()
         sceneView.session.run(config, options: [])
     }
     
+    /// Starts a new recording session.
+    /// Creates a new directory with the current timestamp and initializes file writers.
     func startRecording() {
-        setupFiles()
-        startIMU()
-        isRecording = true
-    }
-    
-    func stopRecording() {
-        isRecording = false
-        motionManager.stopDeviceMotionUpdates()
-        closeFiles()
+        guard !isRecording else { return }
         
-        if let assetWriter = assetWriter, assetWriter.status == .writing {
-            videoInput?.markAsFinished()
-            assetWriter.finishWriting { [weak self] in
-                self?.assetWriter = nil
-                self?.videoInput = nil
-                self?.pixelBufferAdaptor = nil
-                self?.isWriterSessionStarted = false
-            }
+        if setupFiles() {
+            startIMU()
+            isRecording = true
+            sampleCount = 0
+        } else {
+            print("Failed to setup files for recording.")
         }
     }
     
-    // MARK: - File Setup (Same as before)
-    private func setupFiles() {
+    /// Stops the current recording session.
+    /// Closes all file handles and finishes video writing.
+    func stopRecording() {
+        guard isRecording else { return }
+        
+        isRecording = false
+        motionManager.stopDeviceMotionUpdates()
+        
+        // Close CSVs
+        imuWriter?.close()
+        poseWriter?.close()
+        imuWriter = nil
+        poseWriter = nil
+        
+        // Finish Video
+        videoRecorder.finish {
+            print("Video recording finished.")
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Sets up the directory and files for the new session.
+    /// - Returns: True if setup was successful.
+    private func setupFiles() -> Bool {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss-SSS"
         let timestamp = formatter.string(from: Date())
         
-        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
         let sessionDir = docDir.appendingPathComponent("session_\(timestamp)", isDirectory: true)
         
-        try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
-        self.recordingURL = sessionDir
-        
-        // Create CSV Headers
-        let imuURL = sessionDir.appendingPathComponent("imu_data.csv")
-        let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
-        
-        FileManager.default.createFile(atPath: imuURL.path, contents: "timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\n".data(using: .utf8))
-        FileManager.default.createFile(atPath: poseURL.path, contents: "timestamp,tx,ty,tz,qx,qy,qz,qw\n".data(using: .utf8))
-        
-        imuFileHandle = try? FileHandle(forWritingTo: imuURL)
-        poseFileHandle = try? FileHandle(forWritingTo: poseURL)
-        
-        imuFileHandle?.seekToEndOfFile()
-        poseFileHandle?.seekToEndOfFile()
+        do {
+            try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
+            self.recordingURL = sessionDir
+            
+            // Setup CSV Writers
+            let imuURL = sessionDir.appendingPathComponent("imu_data.csv")
+            let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
+            
+            imuWriter = CSVWriter(url: imuURL, header: "timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\n")
+            poseWriter = CSVWriter(url: poseURL, header: "timestamp,tx,ty,tz,qx,qy,qz,qw\n")
+            
+            return imuWriter != nil && poseWriter != nil
+        } catch {
+            print("Error creating session directory: \(error)")
+            return false
+        }
     }
     
-    private func closeFiles() {
-        try? imuFileHandle?.close()
-        try? poseFileHandle?.close()
-    }
-    
-    // MARK: - IMU Capture
+    /// Starts the IMU data capture.
     private func startIMU() {
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1.0 / 200.0
@@ -106,16 +128,16 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
                                  data.rotationRate.y,
                                  data.rotationRate.z)
             
-            if let bytes = csvLine.data(using: .utf8) {
-                self.imuFileHandle?.write(bytes)
-            }
+            self.imuWriter?.write(row: csvLine)
         }
     }
     
-    // MARK: - Camera & Pose Capture
+    // MARK: - ARSessionDelegate
+    
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         guard isRecording, let dir = recordingURL else { return }
         
+        // Log Pose
         let tf = frame.camera.transform
         let poseLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                               frame.timestamp,
@@ -124,59 +146,22 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
                               tf.columns.2.x, tf.columns.2.y, tf.columns.2.z, tf.columns.2.w,
                               tf.columns.3.x, tf.columns.3.y, tf.columns.3.z, tf.columns.3.w)
         
-        if let bytes = poseLine.data(using: .utf8) {
-            poseFileHandle?.write(bytes)
-        }
+        poseWriter?.write(row: poseLine)
         
-        // Video Recording
-        if assetWriter == nil {
-            setupVideoWriter(frame: frame, dir: dir)
+        // Handle Video Recording
+        if !videoRecorder.isWriting {
+            let videoURL = dir.appendingPathComponent("video.mov")
+            let width = Int(frame.camera.imageResolution.width)
+            let height = Int(frame.camera.imageResolution.height)
             
-            // Save the start timestamp to a separate file for synchronization
-            let startURL = dir.appendingPathComponent("video_start_time.txt")
-            try? String(format: "%.6f", frame.timestamp).write(to: startURL, atomically: true, encoding: .utf8)
-        }
-        
-        if let writer = assetWriter, writer.status == .writing, let input = videoInput, input.isReadyForMoreMediaData {
-            let timestamp = CMTime(seconds: frame.timestamp, preferredTimescale: 600)
-            
-            if !isWriterSessionStarted {
-                writer.startSession(atSourceTime: timestamp)
-                isWriterSessionStarted = true
+            if videoRecorder.setup(url: videoURL, width: width, height: height) {
+                // Save the start timestamp to a separate file for synchronization
+                let startURL = dir.appendingPathComponent("video_start_time.txt")
+                try? String(format: "%.6f", frame.timestamp).write(to: startURL, atomically: true, encoding: .utf8)
             }
-            
-            pixelBufferAdaptor?.append(frame.capturedImage, withPresentationTime: timestamp)
-            self.sampleCount += 1
-        }
-    }
-    
-    private func setupVideoWriter(frame: ARFrame, dir: URL) {
-        let videoURL = dir.appendingPathComponent("video.mov")
-        let width = Int(frame.camera.imageResolution.width)
-        let height = Int(frame.camera.imageResolution.height)
-        
-        do {
-            assetWriter = try AVAssetWriter(outputURL: videoURL, fileType: .mov)
-        } catch {
-            print("Failed to create asset writer: \(error)")
-            return
         }
         
-        let outputSettings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: width,
-            AVVideoHeightKey: height
-        ]
-        
-        videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
-        videoInput?.expectsMediaDataInRealTime = true
-        
-        pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput!, sourcePixelBufferAttributes: nil)
-        
-        if assetWriter?.canAdd(videoInput!) == true {
-            assetWriter?.add(videoInput!)
-        }
-        
-        assetWriter?.startWriting()
+        videoRecorder.append(pixelBuffer: frame.capturedImage, timestamp: frame.timestamp)
+        self.sampleCount += 1
     }
 }
