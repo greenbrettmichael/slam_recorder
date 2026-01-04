@@ -86,4 +86,3 @@ class CSVWriter {
         fileHandle = nil
     }
 }
-
