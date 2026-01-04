@@ -23,6 +23,7 @@ class RecordingCoordinator(
     private val context: Context,
     private val sensorManager: SensorManager,
     private val cameraManager: android.hardware.camera2.CameraManager,
+    private val cameraEnumerator: CameraEnumerator,
 ) {
     data class Result(val success: Boolean, val message: String? = null)
 
@@ -73,13 +74,19 @@ class RecordingCoordinator(
                 if (ids.isEmpty()) {
                     return@withContext Result(false, "No cameras selected")
                 }
+                
+                // Look up camera options to determine if we need physical camera handling
+                val allOptions = cameraEnumerator.listCameraOptions()
+                val selectedOptions = ids.mapNotNull { id -> allOptions.find { opt -> opt.id == id } }
+                
                 val multi = MultiCameraCaptureController(context, cameraManager)
                 multiCameraCapture = multi
-                val camFiles = ids.map { id ->
+                val camFiles = selectedOptions.map { option ->
                     MultiCameraCaptureController.CamSpec(
-                        cameraId = id,
-                        outputFile = files.videoFileForCamera(id),
-                        previewSurface = multiPreviewSurfaces[id],
+                        cameraId = option.id,
+                        outputFile = files.videoFileForCamera(option.id),
+                        previewSurface = multiPreviewSurfaces[option.id],
+                        parentLogicalCameraId = option.parentLogicalCameraId,
                     )
                 }
                 val sharedStart = SystemClock.elapsedRealtimeNanos()

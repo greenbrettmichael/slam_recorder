@@ -19,6 +19,8 @@ internal class FakeCameraEnumerator(
                 facing = null,
                 isLogical = false,
                 physicalIds = emptySet(),
+                parentLogicalCameraId = null,
+                focalLength = null,
             )
         }
 }

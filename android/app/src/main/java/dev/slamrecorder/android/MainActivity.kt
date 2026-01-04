@@ -36,9 +36,9 @@ class MainActivity : ComponentActivity() {
 
         val cameraManager = getSystemService(CAMERA_SERVICE) as CameraManager
         val sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        val recordingCoordinator = RecordingCoordinator(applicationContext, sensorManager, cameraManager)
         val supportChecker = MultiCamSupportChecker(cameraManager)
         val cameraEnumerator = CameraEnumerator(cameraManager)
+        val recordingCoordinator = RecordingCoordinator(applicationContext, sensorManager, cameraManager, cameraEnumerator)
 
         setContent {
             val viewModel: RecordingViewModel = viewModel(factory = recordingViewModelFactory(supportChecker, cameraEnumerator, recordingCoordinator))
