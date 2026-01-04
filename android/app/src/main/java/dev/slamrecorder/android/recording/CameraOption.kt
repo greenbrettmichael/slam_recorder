@@ -46,7 +46,7 @@ data class CameraOption(
 open class CameraEnumerator(private val cameraManager: CameraManager) {
     open fun listCameraOptions(): List<CameraOption> {
         val options = mutableListOf<CameraOption>()
-        val seenIds = mutableSetOf<String>()
+        val seenKeys = mutableSetOf<String>()
         
         // Enumerate all logical cameras and their physical sub-cameras
         cameraManager.cameraIdList.forEach { id ->
@@ -70,17 +70,18 @@ open class CameraEnumerator(private val cameraManager: CameraManager) {
                         focalLength = focalLength,
                     )
                 )
-                seenIds.add(id)
+                seenKeys.add(keyFor(facing, focalLength, parentId = null))
             } else {
                 // For logical cameras, expose each physical camera as accessible through parent
                 physicalIds.forEach { physicalId ->
-                    if (!seenIds.contains(physicalId)) {
-                        val physicalChars = runCatching { 
-                            cameraManager.getCameraCharacteristics(physicalId) 
-                        }.getOrNull()
-                        val physicalFacing = physicalChars?.get(CameraCharacteristics.LENS_FACING)
-                        val physicalFocalLengths = physicalChars?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-                        val physicalFocalLength = physicalFocalLengths?.firstOrNull()
+                    val physicalChars = runCatching { 
+                        cameraManager.getCameraCharacteristics(physicalId) 
+                    }.getOrNull()
+                    val physicalFacing = physicalChars?.get(CameraCharacteristics.LENS_FACING)
+                    val physicalFocalLengths = physicalChars?.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    val physicalFocalLength = physicalFocalLengths?.firstOrNull()
+                    val key = keyFor(physicalFacing, physicalFocalLength, parentId = id)
+                    if (seenKeys.add(key)) {
                         options.add(
                             CameraOption(
                                 id = physicalId,
@@ -91,12 +92,16 @@ open class CameraEnumerator(private val cameraManager: CameraManager) {
                                 focalLength = physicalFocalLength,
                             )
                         )
-                        seenIds.add(physicalId)
                     }
                 }
             }
         }
         
         return options
+    }
+
+    private fun keyFor(facing: Int?, focalLength: Float?, parentId: String?): String {
+        val roundedFocal = focalLength?.let { kotlin.math.round(it * 10) / 10f } ?: -1f
+        return "${parentId ?: "root"}-$facing-$roundedFocal"
     }
 }

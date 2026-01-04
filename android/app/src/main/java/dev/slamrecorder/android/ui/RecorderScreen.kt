@@ -44,6 +44,7 @@ fun recorderScreen(
     onMultiPreviewSurface: (String, android.view.Surface?) -> Unit = { _, _ -> },
 ) {
     var showModeEditor by rememberSaveable { mutableStateOf(false) }
+    var editingMulti by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier =
@@ -120,12 +121,22 @@ fun recorderScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (state.selectedMode == RecordingMode.MULTI_CAMERA) {
-                    Text(
-                        text = "Multi-camera: select up to 2 cameras and preview below.",
-                        style = MaterialTheme.typography.bodySmall,
+                    MultiCamSelectionSection(
+                        state = state,
+                        editing = editingMulti,
+                        onEditingChange = { editingMulti = it },
+                        onCameraToggle = onCameraToggle,
                     )
-                    cameraSelectorList(state, onCameraToggle)
-                    multiCameraPreviews(state, onMultiPreviewSurface)
+
+                    if (!editingMulti) {
+                        multiCameraPreviews(state, onMultiPreviewSurface)
+                    } else {
+                        Text(
+                            text = "Finish selection to refresh previews.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
                 } else {
                     cameraPreview(onPreviewReady = onPreviewReady)
                 }
@@ -205,6 +216,50 @@ private fun cameraSelectorList(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+    }
+}
+
+@Composable
+private fun MultiCamSelectionSection(
+    state: RecorderUiState,
+    editing: Boolean,
+    onEditingChange: (Boolean) -> Unit,
+    onCameraToggle: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Multi-camera selection",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                val summary = if (state.selectedCameraIds.isEmpty()) {
+                    "No cameras selected"
+                } else {
+                    state.availableCameras
+                        .filter { state.selectedCameraIds.contains(it.id) }
+                        .joinToString("; ") { it.label }
+                }
+                Text(text = summary, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = { onEditingChange(!editing) }) {
+                Text(if (editing) "Done" else "Change")
+            }
+        }
+
+        if (editing) {
+            Text(
+                text = "Select up to 2 cameras.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            cameraSelectorList(state, onCameraToggle)
         }
     }
 }
