@@ -58,7 +58,7 @@ class SimpleArCoreRecorder(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.DelicateCoroutinesApi::class)
     private val glDispatcher = newSingleThreadContext("SimpleArCoreGl")
-    
+
     private var session: Session? = null
     private var poseJob: Job? = null
     private var eglDisplay: EGLDisplay? = null
@@ -257,26 +257,26 @@ class SimpleArCoreRecorder(
     private suspend fun poseLoop(session: Session?) {
         session ?: return
         var frameCount = 0
-        val skipInitialFrames = 10  // Skip first ~300ms of frames to avoid bad tracking
+        val skipInitialFrames = 10 // Skip first ~300ms of frames to avoid bad tracking
         while (scope.isActive) {
             try {
                 // Make GL current before updating session
                 makeGlCurrent()
-                
+
                 val frame: Frame = session.update()
                 frameCount++
-                
+
                 // Skip initial frames with unreliable tracking
                 if (frameCount <= skipInitialFrames) {
                     delay(30)
                     continue
                 }
-                
+
                 // Only write poses when tracking is active (not LIMITED or PAUSED)
                 if (frame.camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
                     writePose(frame.camera.pose, frame.timestamp)
                 }
-                
+
                 if (frameCount % 30 == 0) {
                     android.util.Log.d("SimpleArCore", "Pose frame: $frameCount, tracking=${frame.camera.trackingState}")
                 }

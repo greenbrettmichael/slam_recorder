@@ -1,8 +1,6 @@
 package dev.slamrecorder.android.recording
 
 import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraManager
-import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

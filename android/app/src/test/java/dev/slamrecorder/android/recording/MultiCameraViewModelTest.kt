@@ -1,6 +1,5 @@
 package dev.slamrecorder.android.recording
 
-import android.hardware.camera2.CameraManager
 import android.view.Surface
 import io.mockk.coEvery
 import io.mockk.coVerify

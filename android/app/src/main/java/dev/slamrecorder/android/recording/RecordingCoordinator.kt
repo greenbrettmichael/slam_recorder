@@ -102,7 +102,7 @@ class RecordingCoordinator(
             if (mode != RecordingMode.MULTI_CAMERA) {
                 // Warmup delay: let camera stabilize focus/exposure
                 kotlinx.coroutines.delay(1500)
-                
+
                 videoCapture = VideoCaptureController(context)
                 val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
                 files.videoStartFile.writeText(videoStartNanos.toString())
@@ -114,14 +114,14 @@ class RecordingCoordinator(
                 if (ids.isEmpty()) {
                     return@withContext Result(false, "No cameras selected")
                 }
-                
+
                 // Look up camera options to determine if we need physical camera handling
                 val allOptions = cameraEnumerator.listCameraOptions()
                 val selectedOptions = ids.mapNotNull { id -> allOptions.find { opt -> opt.id == id } }
-                
+
                 // Warmup delay: let cameras stabilize focus/exposure
                 kotlinx.coroutines.delay(1500)
-                
+
                 val multi = MultiCameraCaptureController(context, cameraManager)
                 multiCameraCapture = multi
                 val camFiles = selectedOptions.map { option ->
@@ -153,7 +153,7 @@ class RecordingCoordinator(
      *
      * @return Result indicating successful stop
      */
-    fun stop(): Result {
+    suspend fun stop(): Result {
         imuRecorder?.stop()
         videoCapture?.stop()
         multiCameraCapture?.stop()
@@ -161,16 +161,14 @@ class RecordingCoordinator(
         imuRecorder = null
         videoCapture = null
         multiCameraCapture = null
-        
-        // Stop ARCore recorder in a coroutine since it's suspend
+
+        // Stop ARCore recorder - must await completion to ensure cleanup
         val toStop = arCoreRecorder
         arCoreRecorder = null
         if (toStop != null) {
-            scope.launch {
-                toStop.stop()
-            }
+            toStop.stop()
         }
-        
+
         return Result(true)
     }
 

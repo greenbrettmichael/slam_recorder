@@ -10,22 +10,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,10 +48,10 @@ fun recorderScreen(
 
     Column(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -150,8 +150,8 @@ fun recorderScreen(
                     onClick = onToggleRecording,
                     modifier = Modifier.fillMaxWidth(),
                     enabled =
-                        state.selectedMode != RecordingMode.MULTI_CAMERA ||
-                            (state.multiCamSupported && state.selectedCameraIds.isNotEmpty()),
+                    state.selectedMode != RecordingMode.MULTI_CAMERA ||
+                        (state.multiCamSupported && state.selectedCameraIds.isNotEmpty()),
                 ) {
                     Text(text = if (state.isRecording) "Stop Recording" else "Start Recording")
                 }
@@ -179,9 +179,9 @@ fun recorderScreen(
 private fun cameraPreview(onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit) {
     AndroidView(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(220.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(220.dp),
         factory = { context ->
             PreviewView(context).apply {
                 this.scaleType = PreviewView.ScaleType.FILL_CENTER
@@ -273,9 +273,9 @@ private fun multiCameraPreviews(
         state.selectedCameraIds.take(2).forEach { camId ->
             AndroidView(
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
                 factory = { context ->
                     android.view.TextureView(context).apply {
                         surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
@@ -336,12 +336,12 @@ private fun recorderScreenPreview() {
     appTheme {
         recorderScreen(
             state =
-                RecorderUiState(
-                    selectedMode = RecordingMode.AR_CORE,
-                    isRecording = false,
-                    multiCamSupported = false,
-                    supportMessage = "Multi-camera not supported",
-                ),
+            RecorderUiState(
+                selectedMode = RecordingMode.AR_CORE,
+                isRecording = false,
+                multiCamSupported = false,
+                supportMessage = "Multi-camera not supported",
+            ),
             onModeSelected = {},
             onCameraToggle = {},
             onToggleRecording = {},

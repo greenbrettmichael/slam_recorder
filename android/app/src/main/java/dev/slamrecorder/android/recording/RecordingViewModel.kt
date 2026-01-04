@@ -74,8 +74,11 @@ class RecordingViewModel(
             state.copy(
                 availableCameras = cams,
                 // Default to first back camera if nothing selected
-                selectedCameraIds = if (state.selectedCameraIds.isEmpty() && cams.isNotEmpty())
-                    setOf(cams.first().id) else state.selectedCameraIds,
+                selectedCameraIds = if (state.selectedCameraIds.isEmpty() && cams.isNotEmpty()) {
+                    setOf(cams.first().id)
+                } else {
+                    state.selectedCameraIds
+                },
             )
         }
     }

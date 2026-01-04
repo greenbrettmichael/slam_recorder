@@ -134,14 +134,14 @@ jobs:
           cmdline-tools-version: "latest"
           components: |-
             platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+            platforms;android-34
+            build-tools;34.0.0
 
       - name: Gradle Wrapper Validation
         uses: gradle/actions/wrapper-validation@v3
 
       - name: Build and Test
-        run: ./gradlew spotlessCheck :app:assembleDebug :app:testDebugUnitTest :app:koverXmlReport
+        run: ./gradlew spotlessApply spotlessCheck :app:assembleDebug :app:testDebugUnitTest :app:koverXmlReport
 
       - name: Upload Test Reports
         if: always()

@@ -8,7 +8,7 @@ package dev.slamrecorder.android.recording
 enum class RecordingMode(val label: String) {
     /** ARCore-based recording with pose tracking and single camera video */
     AR_CORE("ARCore"),
-    
+
     /** Multi-camera simultaneous recording (up to 2 cameras) without AR tracking */
     MULTI_CAMERA("Multi-camera"),
 }
