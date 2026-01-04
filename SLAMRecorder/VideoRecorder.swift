@@ -55,14 +55,24 @@ class VideoRecorder {
     }
 
     /// Sets a desired session start time that will be used when the first frame arrives.
+    ///
+    /// This method should be called before the first frame is appended. If not set,
+    /// the first frame's timestamp will be used as the session start time.
+    ///
+    /// - Parameter time: The CMTime value representing when the video session should start.
     func setPreferredStartTime(_ time: CMTime) {
         preferredStartTime = time
     }
 
     /// Appends a frame to the video.
+    ///
+    /// This method encodes and writes a pixel buffer at the specified timestamp to the video file.
+    /// The method handles the session start time automatically on the first frame.
+    /// Must be called on the main thread for pixel buffer handling.
+    ///
     /// - Parameters:
-    ///   - pixelBuffer: The image buffer.
-    ///   - timestamp: The presentation timestamp.
+    ///   - pixelBuffer: The image buffer (CVPixelBuffer) containing the frame data to encode.
+    ///   - timestamp: The presentation timestamp in seconds for frame synchronization.
     func append(pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) {
         guard let writer = assetWriter, writer.status == .writing,
               let input = videoInput, input.isReadyForMoreMediaData,
@@ -79,7 +89,11 @@ class VideoRecorder {
     }
 
     /// Finishes writing the video.
-    /// - Parameter completion: Called when writing is finished.
+    ///
+    /// This method completes the video encoding and performs cleanup. The completion handler
+    /// is called asynchronously after all data has been written to the file.
+    ///
+    /// - Parameter completion: Called when writing is finished and the file is ready for use.
     func finish(completion: @escaping () -> Void) {
         guard let writer = assetWriter, writer.status == .writing else {
             completion()

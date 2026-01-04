@@ -3,6 +3,7 @@ import AVFoundation
 import CoreMotion
 import SceneKit
 import SwiftUI
+import OSLog
 
 /// The main controller for SLAM data recording.
 /// This class manages the ARSession, captures IMU data, and coordinates writing to CSV and Video files.
@@ -27,6 +28,9 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - Private Properties
 
     private let motionManager = CMMotionManager()
+    
+    // Diagnostic Logging
+    private let logger: Logger = Logger(subsystem: "com.bmgvisualtech.slamrecorder", category: "SLAMLogger")
 
     // Helpers
     private var imuWriter: CSVWriter?
@@ -55,7 +59,12 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - Public Methods
 
     /// Starts the AR session monitoring.
-    /// This should be called when the view appears.
+    ///
+    /// This method configures and runs the ARWorldTrackingConfiguration for the current AR session.
+    /// Call this when the AR view appears to begin session tracking. This does not start recording;
+    /// call `startRecording()` separately to begin capturing data.
+    ///
+    /// - Note: If recording mode is not .arkit, the session will be paused instead.
     func startMonitoring() {
         guard recordingMode == .arkit else {
             sceneView.session.pause()
@@ -66,12 +75,22 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     /// Provides preview layers for multi-camera mode if available.
+    ///
+    /// This method returns a dictionary mapping camera identifiers to their corresponding
+    /// AVCaptureVideoPreviewLayer objects for display in the UI.
+    ///
+    /// - Returns: A dictionary of camera ID to preview layer mappings. Empty if multi-camera is unavailable.
     func multiCamPreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer] {
         multiCamRecorder.makePreviewLayers()
     }
 
     /// Starts a new recording session.
-    /// Creates a new directory with the current timestamp and initializes file writers.
+    ///
+    /// This method creates a timestamped session directory, initializes CSV writers for IMU and pose data,
+    /// starts IMU capture at 200Hz, and begins video recording if in ARKit mode.
+    /// The recording state is published via the `isRecording` property.
+    ///
+    /// - Note: Validates camera selection for multi-camera mode and logs errors to the console if recording fails.
     func startRecording() {
         guard !isRecording else { return }
 
@@ -89,10 +108,12 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
             case .arkit:
                 isRecording = true
                 sampleCount = 0
+                logger.info("AR mode: recording started")
             case .multiCamera:
                 guard let dir = recordingURL else { return }
                 let success = multiCamRecorder.startRecording(cameras: selectedCameras, directory: dir)
                 isRecording = success
+                logger.info("Multi-camera mode: recording \(success ? "started" : "failed")")
                 if !success {
                     print("Multi-camera recording not supported or failed to start.")
                     motionManager.stopDeviceMotionUpdates()
@@ -106,7 +127,10 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     /// Stops the current recording session.
-    /// Closes all file handles and finishes video writing.
+    ///
+    /// This method halts all data capture (IMU, video, and pose data), closes file handles,
+    /// flushes buffered writes to disk, and cleans up resources. Call this when you want to
+    /// end the current recording and save all data.
     func stopRecording() {
         guard isRecording else { return }
 
@@ -132,18 +156,26 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - Private Methods
 
     /// Sets up the directory and files for the new session.
-    /// - Returns: True if setup was successful.
+    ///
+    /// Creates a timestamped session directory and initializes CSV writers for IMU and pose data.
+    /// The session directory path is stored in `recordingURL` for use by video and other recording modes.
+    ///
+    /// - Returns: `true` if the directory and all necessary file writers were created successfully; `false` otherwise.
     private func setupFiles() -> Bool {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss-SSS"
         let timestamp = formatter.string(from: Date())
 
-        guard let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
+        guard let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { 
+            logger.error("Could not get Documents directory")
+            return false 
+        }
         let sessionDir = docDir.appendingPathComponent("session_\(timestamp)", isDirectory: true)
 
         do {
             try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
             recordingURL = sessionDir
+            logger.info("Created session directory: \(sessionDir.path)")
 
             // Setup CSV Writers
             let imuURL = sessionDir.appendingPathComponent("imu_data.csv")
@@ -164,13 +196,17 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     /// Starts the IMU data capture.
+    ///
+    /// Configures the device motion manager to capture accelerometer and gyroscope data at 200Hz.
+    /// Data is written to the CSV file via the buffered background queue, minimizing main thread impact.
+    /// Total acceleration (user acceleration + gravity) is captured for complete inertial measurements.
     private func startIMU() {
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1.0 / 200.0
 
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data, isRecording else { return }
-
+            
             let csvLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                                  data.timestamp,
                                  data.userAcceleration.x + data.gravity.x,
@@ -186,10 +222,25 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
     // MARK: - ARSessionDelegate
 
+    /// Called when the AR session captures a new frame.
+    ///
+    /// This is the primary data capture callback that executes at the AR frame rate (typically 30-60 Hz).
+    /// For each frame, it captures and writes pose data (camera transform) and video frames.
+    /// Operations are optimized to minimize main thread blocking:
+    /// - CSV writes are buffered on a background queue with periodic flushing
+    /// - Video encoding handles pixel buffers with minimal overhead
+    ///
+    /// - Parameters:
+    ///   - session: The ARSession that updated the frame.
+    ///   - frame: The ARFrame containing camera pose, transform matrix, and pixel data.
     func session(_: ARSession, didUpdate frame: ARFrame) {
         guard isRecording, recordingMode == .arkit, let dir = recordingURL else { return }
+        
+        if sampleCount == 0 {
+            logger.info("First AR frame received, starting to record")
+        }
 
-        // Log Pose
+        // Log Pose - offload CSV write to background to reduce main thread load
         let tf = frame.camera.transform
         let poseLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                               frame.timestamp,
@@ -198,9 +249,10 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
                               tf.columns.2.x, tf.columns.2.y, tf.columns.2.z, tf.columns.2.w,
                               tf.columns.3.x, tf.columns.3.y, tf.columns.3.z, tf.columns.3.w)
 
+        // CSV write is now buffered on background queue, so this is very fast
         poseWriter?.write(row: poseLine)
 
-        // Handle Video Recording
+        // Handle Video Recording (must be on main thread for pixel buffer handling)
         if !videoRecorder.isWriting {
             let videoURL = dir.appendingPathComponent("video.mov")
             let width = Int(frame.camera.imageResolution.width)
