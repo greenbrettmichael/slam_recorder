@@ -8,7 +8,7 @@ import Foundation
 class CSVWriter {
     private var fileHandle: FileHandle?
     private let fileURL: URL
-    
+
     // Performance optimization: buffer writes and flush on background queue
     private var writeBuffer: [String] = []
     private let writeQueue = DispatchQueue(label: "com.slamrecorder.csvwrite", qos: .userInitiated)
@@ -38,7 +38,7 @@ class CSVWriter {
             print("Failed to create file handle for \(url.lastPathComponent): \(error)")
             return nil
         }
-        
+
         // Start periodic buffer flush
         startPeriodicFlush()
     }
@@ -49,27 +49,27 @@ class CSVWriter {
         // Add to buffer instead of writing immediately (main thread optimization)
         writeQueue.async { [weak self] in
             self?.writeBuffer.append(row)
-            
+
             // Flush if buffer gets large
             if self?.writeBuffer.count ?? 0 >= 100 {
                 self?.flushBuffer()
             }
         }
     }
-    
+
     private func startPeriodicFlush() {
         writeQueue.asyncAfter(deadline: .now() + bufferFlushInterval) { [weak self] in
             self?.flushBuffer()
             self?.startPeriodicFlush()
         }
     }
-    
+
     private func flushBuffer() {
-        guard !writeBuffer.isEmpty, let fileHandle = fileHandle else { return }
-        
+        guard !writeBuffer.isEmpty, fileHandle != nil else { return }
+
         let bufferToFlush = writeBuffer
         writeBuffer.removeAll(keepingCapacity: true)
-        
+
         // Write all buffered rows in a single operation
         for row in bufferToFlush {
             if let data = row.data(using: .utf8) {
@@ -86,3 +86,4 @@ class CSVWriter {
         fileHandle = nil
     }
 }
+

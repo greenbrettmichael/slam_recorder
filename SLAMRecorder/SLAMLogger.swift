@@ -1,9 +1,9 @@
 import ARKit
 import AVFoundation
 import CoreMotion
+import OSLog
 import SceneKit
 import SwiftUI
-import OSLog
 
 /// The main controller for SLAM data recording.
 /// This class manages the ARSession, captures IMU data, and coordinates writing to CSV and Video files.
@@ -28,9 +28,9 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // MARK: - Private Properties
 
     private let motionManager = CMMotionManager()
-    
+
     // Diagnostic Logging
-    private let logger: Logger = Logger(subsystem: "com.bmgvisualtech.slamrecorder", category: "SLAMLogger")
+    private let logger: Logger = .init(subsystem: "com.bmgvisualtech.slamrecorder", category: "SLAMLogger")
 
     // Helpers
     private var imuWriter: CSVWriter?
@@ -165,9 +165,9 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss-SSS"
         let timestamp = formatter.string(from: Date())
 
-        guard let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { 
+        guard let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             logger.error("Could not get Documents directory")
-            return false 
+            return false
         }
         let sessionDir = docDir.appendingPathComponent("session_\(timestamp)", isDirectory: true)
 
@@ -205,7 +205,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data, isRecording else { return }
-            
+
             let csvLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                                  data.timestamp,
                                  data.userAcceleration.x + data.gravity.x,
@@ -234,7 +234,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     ///   - frame: The ARFrame containing camera pose, transform matrix, and pixel data.
     func session(_: ARSession, didUpdate frame: ARFrame) {
         guard isRecording, recordingMode == .arkit, let dir = recordingURL else { return }
-        
+
         if sampleCount == 0 {
             logger.info("First AR frame received, starting to record")
         }
