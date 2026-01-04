@@ -65,15 +65,23 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         sceneView.session.run(config, options: [])
     }
 
-    /// Provides a preview layer for multi-camera mode if available.
-    func multiCamPreviewLayer() -> AVCaptureVideoPreviewLayer? {
-        multiCamRecorder.makePreviewLayer()
+    /// Provides preview layers for multi-camera mode if available.
+    func multiCamPreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer] {
+        multiCamRecorder.makePreviewLayers()
     }
 
     /// Starts a new recording session.
     /// Creates a new directory with the current timestamp and initializes file writers.
     func startRecording() {
         guard !isRecording else { return }
+
+        // Validate camera selection for multi-camera mode
+        if recordingMode == .multiCamera {
+            guard !selectedCameras.isEmpty, selectedCameras.count <= 2 else {
+                print("Invalid camera selection. Please select 1-2 cameras.")
+                return
+            }
+        }
 
         if setupFiles() {
             startIMU()

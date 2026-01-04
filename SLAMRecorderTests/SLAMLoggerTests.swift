@@ -146,6 +146,40 @@ final class SLAMLoggerTests: XCTestCase {
         logger.startRecording()
         XCTAssertFalse(logger.isRecording)
     }
+
+    func testMultiCamRejectsEmptyCameraSelection() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = []
+        logger.startRecording()
+        XCTAssertFalse(logger.isRecording)
+        XCTAssertFalse(mockMultiCam.startCalled)
+    }
+
+    func testMultiCamRejectsTooManyCameras() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide, .front, .backUltraWide]
+        logger.startRecording()
+        XCTAssertFalse(logger.isRecording)
+        XCTAssertFalse(mockMultiCam.startCalled)
+    }
+
+    func testMultiCamAcceptsOneCamera() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        XCTAssertTrue(mockMultiCam.startCalled)
+        logger.stopRecording()
+    }
+
+    func testMultiCamAcceptsTwoCameras() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide, .front]
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        XCTAssertTrue(mockMultiCam.startCalled)
+        logger.stopRecording()
+    }
 }
 
 // MARK: - Test Doubles
@@ -167,7 +201,7 @@ final class MockMultiCamRecorder: MultiCamRecording {
         shouldStartSucceed = true
     }
 
-    func makePreviewLayer() -> AVCaptureVideoPreviewLayer? { nil }
+    func makePreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer] { [:] }
 
     func startRecording(cameras: Set<CameraID>, directory: URL) -> Bool {
         startCalled = true

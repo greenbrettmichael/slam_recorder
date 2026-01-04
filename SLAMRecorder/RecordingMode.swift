@@ -17,7 +17,7 @@ enum RecordingMode: String, CaseIterable {
 /// Fallback recorder used on platforms that do not support multi-camera recording.
 final class NoopMultiCamRecorder: MultiCamRecording {
     var isRecording: Bool = false
-    func makePreviewLayer() -> AVCaptureVideoPreviewLayer? { nil }
+    func makePreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer] { [:] }
     func startRecording(cameras _: Set<CameraID>, directory _: URL) -> Bool { false }
     func stopRecording() { isRecording = false }
 }

@@ -22,7 +22,7 @@ final class RecordingModeTests: XCTestCase {
     func testNoopMultiCamRecorderInitialState() {
         let noop = NoopMultiCamRecorder()
         XCTAssertFalse(noop.isRecording)
-        XCTAssertNil(noop.makePreviewLayer())
+        XCTAssertTrue(noop.makePreviewLayers().isEmpty)
     }
 
     func testNoopMultiCamRecorderStartFails() {

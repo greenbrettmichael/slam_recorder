@@ -53,7 +53,7 @@ enum CameraID: CaseIterable, Hashable {
 /// Protocol abstraction for multi-camera recording to enable testing with mocks.
 protocol MultiCamRecording {
     var isRecording: Bool { get }
-    func makePreviewLayer() -> AVCaptureVideoPreviewLayer?
+    func makePreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer]
     func startRecording(cameras: Set<CameraID>, directory: URL) -> Bool
     func stopRecording()
 }
@@ -67,12 +67,12 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
     private var outputURLs: [CameraID: URL] = [:]
     private let queue = DispatchQueue(label: "multicam.capture.queue")
     private(set) var isRecording: Bool = false
-    private var previewLayer: AVCaptureVideoPreviewLayer?
+    private var previewLayers: [CameraID: AVCaptureVideoPreviewLayer] = [:]
     private var sessionStartTime: CMTime?
     private var recordingDirectory: URL?
 
-    func makePreviewLayer() -> AVCaptureVideoPreviewLayer? {
-        previewLayer
+    func makePreviewLayers() -> [CameraID: AVCaptureVideoPreviewLayer] {
+        previewLayers
     }
 
     func startRecording(cameras: Set<CameraID>, directory: URL) -> Bool {
@@ -87,13 +87,23 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         outputMap.removeAll()
         recorders.removeAll()
         sessionStartTime = nil
-        previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer?.videoGravity = .resizeAspectFill
+        previewLayers.removeAll()
         session.beginConfiguration()
 
         for camera in limited {
             guard let device = camera.resolveDevice(), let input = try? AVCaptureDeviceInput(device: device) else { continue }
             if session.canAddInput(input) { session.addInput(input) }
+
+            // Create individual preview layer for this camera
+            let previewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
+            previewLayer.videoGravity = .resizeAspectFill
+            if let port = input.ports.first {
+                let connection = AVCaptureConnection(inputPort: port, videoPreviewLayer: previewLayer)
+                if session.canAddConnection(connection) {
+                    session.addConnection(connection)
+                    previewLayers[camera] = previewLayer
+                }
+            }
             let output = AVCaptureVideoDataOutput()
             output.alwaysDiscardsLateVideoFrames = false
             output.setSampleBufferDelegate(self, queue: queue)
@@ -125,7 +135,7 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         recorders.removeAll()
         outputMap.removeAll()
         outputURLs.removeAll()
-        previewLayer = nil
+        previewLayers.removeAll()
         sessionStartTime = nil
         recordingDirectory = nil
     }
