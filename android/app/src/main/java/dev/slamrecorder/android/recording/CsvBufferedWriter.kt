@@ -6,6 +6,16 @@ import java.io.FileWriter
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * Thread-safe CSV writer with buffering for high-frequency sensor data recording.
+ *
+ * Automatically writes CSV headers on initialization and provides synchronized methods
+ * for writing rows and closing the file. Designed to handle high-frequency data streams
+ * without blocking the caller on I/O errors.
+ *
+ * @property file The output CSV file
+ * @property headers Column headers to write as the first line
+ */
 class CsvBufferedWriter(
     private val file: File,
     headers: List<String>,
@@ -19,6 +29,14 @@ class CsvBufferedWriter(
         writer.flush()
     }
 
+    /**
+     * Writes a single row of CSV data.
+     *
+     * Thread-safe method that silently ignores I/O errors to prevent recording crashes.
+     * No-op if the writer has been closed.
+     *
+     * @param values The values to write as a comma-separated row
+     */
     @Synchronized
     fun writeRow(values: List<String>) {
         if (closed.get()) return
@@ -30,6 +48,12 @@ class CsvBufferedWriter(
         }
     }
 
+    /**
+     * Flushes buffered data and closes the writer.
+     *
+     * Thread-safe and idempotent - safe to call multiple times.
+     * Suppresses I/O exceptions during flush and close operations.
+     */
     @Synchronized
     fun flushAndClose() {
         if (closed.compareAndSet(false, true)) {

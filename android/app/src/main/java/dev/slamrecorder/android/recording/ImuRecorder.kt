@@ -10,6 +10,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
+/**
+ * Records accelerometer and gyroscope data from the device's IMU sensors to CSV.
+ *
+ * Registers for SENSOR_DELAY_FASTEST with automatic fallback to SENSOR_DELAY_GAME
+ * if high sampling rate permissions are unavailable. Timestamps are converted to
+ * seconds (double precision) for consistency with ARCore pose timestamps.
+ *
+ * Output format: timestamp, x, y, z, type ("accel" or "gyro")
+ *
+ * @property sensorManager The system sensor manager
+ * @property writer CSV writer for outputting sensor data
+ * @property scope Coroutine scope for launching sensor registration
+ */
 class ImuRecorder(
     private val sensorManager: SensorManager,
     private val writer: CsvBufferedWriter,
@@ -17,6 +30,11 @@ class ImuRecorder(
 ) : SensorEventListener {
     private var job: Job? = null
 
+    /**
+     * Starts IMU sensor recording.
+     *
+     * Registers listeners for accelerometer and gyroscope at maximum available rate.
+     */
     fun start() {
         job =
             scope.launch {
@@ -25,6 +43,11 @@ class ImuRecorder(
             }
     }
 
+    /**
+     * Stops IMU recording and closes the output file.
+     *
+     * Unregisters all sensor listeners and flushes buffered data.
+     */
     fun stop() {
         job?.cancel()
         sensorManager.unregisterListener(this)

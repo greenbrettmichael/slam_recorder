@@ -25,6 +25,12 @@ import dev.slamrecorder.android.ui.appTheme
 import dev.slamrecorder.android.ui.recorderScreen
 import kotlinx.coroutines.launch
 
+/**
+ * Main activity for the SLAM Recorder application.
+ *
+ * Handles camera and audio permissions, initializes the recording coordinator,
+ * and manages the Compose UI for recording controls and session export.
+ */
 class MainActivity : ComponentActivity() {
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { /* no-op; state checked on launch */ }
@@ -58,6 +64,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Requests required runtime permissions if not already granted.
+     *
+     * Required permissions: CAMERA, RECORD_AUDIO
+     */
     private fun ensurePermissions() {
         val required =
             listOf(
@@ -76,6 +87,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Exports the most recent recording session as a ZIP file and initiates sharing.
+     *
+     * @param coordinator The recording coordinator managing sessions
+     */
     private fun exportLatestSession(coordinator: RecordingCoordinator) {
         lifecycleScope.launch {
             when (val result = coordinator.exportLatest()) {
@@ -96,6 +112,13 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(intent, "Share session"))
     }
 
+    /**
+     * Creates a ViewModelProvider.Factory for dependency injection into RecordingViewModel.
+     *
+     * @param supportChecker Multi-camera capability checker
+     * @param cameraEnumerator Camera discovery and enumeration
+     * @param coordinator Recording session coordinator
+     */
     private fun recordingViewModelFactory(
         supportChecker: MultiCamSupportChecker,
         cameraEnumerator: CameraEnumerator,

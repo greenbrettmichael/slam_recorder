@@ -11,6 +11,17 @@ import kotlinx.coroutines.launch
 
 private const val MULTI_CAM_UNSUPPORTED = "Multi-camera not supported on this device"
 
+/**
+ * UI state for the recording screen.
+ *
+ * @property selectedMode Current recording mode
+ * @property isRecording Whether a recording is in progress
+ * @property multiCamSupported Whether the device supports multi-camera recording
+ * @property supportMessage Error message if mode is unsupported
+ * @property statusMessage General status message (e.g., ARCore warnings)
+ * @property availableCameras List of available camera options
+ * @property selectedCameraIds Set of selected camera IDs for multi-camera mode
+ */
 data class RecorderUiState(
     val selectedMode: RecordingMode = RecordingMode.AR_CORE,
     val isRecording: Boolean = false,
@@ -21,6 +32,16 @@ data class RecorderUiState(
     val selectedCameraIds: Set<String> = emptySet(),
 )
 
+/**
+ * ViewModel for the recording screen.
+ *
+ * Manages UI state, recording lifecycle, and camera selection. Exposes state as a
+ * StateFlow and provides methods for user interactions.
+ *
+ * @property supportChecker Multi-camera capability checker
+ * @property cameraEnumerator Camera discovery and enumeration
+ * @property coordinator Recording session coordinator
+ */
 class RecordingViewModel(
     private val supportChecker: MultiCamSupportChecker,
     private val cameraEnumerator: CameraEnumerator,
@@ -34,6 +55,7 @@ class RecordingViewModel(
         refreshCameraList()
     }
 
+    /** Checks multi-camera support and updates UI state accordingly */
     fun refreshMultiCameraSupport() {
         val supported = supportChecker.isSupported()
         _uiState.update { state ->
@@ -45,6 +67,7 @@ class RecordingViewModel(
         }
     }
 
+    /** Enumerates available cameras and updates UI state */
     fun refreshCameraList() {
         val cams = cameraEnumerator.listCameraOptions()
         _uiState.update { state ->
@@ -57,6 +80,13 @@ class RecordingViewModel(
         }
     }
 
+    /**
+     * Toggles camera selection for multi-camera mode.
+     *
+     * Maximum 2 cameras can be selected simultaneously.
+     *
+     * @param id Camera ID to toggle
+     */
     fun toggleCameraSelection(id: String) {
         _uiState.update { state ->
             val current = state.selectedCameraIds
@@ -70,14 +100,23 @@ class RecordingViewModel(
         }
     }
 
+    /** Updates the preview surface provider for single-camera recording */
     fun setPreviewSurfaceProvider(provider: androidx.camera.core.Preview.SurfaceProvider?) {
         coordinator?.updatePreviewSurfaceProvider(provider)
     }
 
+    /** Updates a preview surface for multi-camera recording */
     fun setMultiPreviewSurface(cameraId: String, surface: android.view.Surface?) {
         coordinator?.updateMultiPreviewSurface(cameraId, surface)
     }
 
+    /**
+     * Selects a recording mode.
+     *
+     * Validates that multi-camera mode is supported before allowing selection.
+     *
+     * @param mode The mode to select
+     */
     fun selectMode(mode: RecordingMode) {
         _uiState.update { state ->
             if (mode == RecordingMode.MULTI_CAMERA && !state.multiCamSupported) {
@@ -88,6 +127,7 @@ class RecordingViewModel(
         }
     }
 
+    /** Toggles recording on/off based on current state */
     fun toggleRecording() {
         val currentlyRecording = _uiState.value.isRecording
         if (currentlyRecording) {

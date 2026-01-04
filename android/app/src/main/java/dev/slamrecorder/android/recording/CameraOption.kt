@@ -3,7 +3,19 @@ package dev.slamrecorder.android.recording
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 
-/** Represents a single selectable camera (physical or logical). */
+/**
+ * Represents a selectable camera option (physical or logical) for recording.
+ *
+ * Physical cameras are individual camera sensors, while logical cameras combine
+ * multiple physical cameras. This class provides metadata for camera selection UI.
+ *
+ * @property id Camera identifier from Camera2 API
+ * @property facing Camera facing direction (LENS_FACING_FRONT, LENS_FACING_BACK, etc.)
+ * @property isLogical Whether this is a logical multi-camera
+ * @property physicalIds Set of physical camera IDs for logical cameras
+ * @property parentLogicalCameraId Parent logical camera ID if this is a physical sub-camera
+ * @property focalLength Primary focal length in millimeters
+ */
 data class CameraOption(
     val id: String,
     val facing: Int?,
@@ -12,6 +24,12 @@ data class CameraOption(
     val parentLogicalCameraId: String? = null,
     val focalLength: Float? = null,
 ) {
+    /**
+     * Human-readable label for UI display.
+     *
+     * Generates descriptive labels based on facing direction, focal length,
+     * and whether the camera is physical or logical.
+     */
     val label: String
         get() {
             val facingLabel = when (facing) {
@@ -42,8 +60,25 @@ data class CameraOption(
         }
 }
 
-/** Enumerates available cameras and exposes logical/physical relationships. */
+/**
+ * Enumerates available cameras and exposes logical/physical camera relationships.
+ *
+ * For devices with logical multi-cameras, this class exposes the individual physical
+ * cameras rather than the logical camera itself. Implements deduplication based on
+ * facing direction and focal length to avoid showing duplicate physical cameras.
+ *
+ * @property cameraManager Camera2 API manager
+ */
 open class CameraEnumerator(private val cameraManager: CameraManager) {
+    /**
+     * Lists all available camera options for selection.
+     *
+     * For logical cameras with physical sub-cameras, only the physical cameras are returned.
+     * Deduplicates cameras with identical facing direction and focal length within the same
+     * logical camera group.
+     *
+     * @return List of selectable camera options
+     */
     open fun listCameraOptions(): List<CameraOption> {
         val options = mutableListOf<CameraOption>()
         val seenKeys = mutableSetOf<String>()

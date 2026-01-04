@@ -19,12 +19,30 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/**
+ * Coordinates all recording activities including IMU, video, and ARCore pose tracking.
+ *
+ * Manages the lifecycle of recording sessions, handles multi-camera vs single-camera modes,
+ * and provides session export functionality. Implements camera warmup delays to ensure
+ * stable focus and exposure before recording begins.
+ *
+ * @property context Application context for file access and system services
+ * @property sensorManager System sensor manager for IMU data
+ * @property cameraManager Camera2 API manager for multi-camera support
+ * @property cameraEnumerator Camera discovery and enumeration utility
+ */
 class RecordingCoordinator(
     private val context: Context,
     private val sensorManager: SensorManager,
     private val cameraManager: android.hardware.camera2.CameraManager,
     private val cameraEnumerator: CameraEnumerator,
 ) {
+    /**
+     * Result of a recording operation.
+     *
+     * @property success Whether the operation succeeded
+     * @property message Optional error or status message
+     */
     data class Result(val success: Boolean, val message: String? = null)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -37,12 +55,24 @@ class RecordingCoordinator(
     private var previewSurfaceProvider: androidx.camera.core.Preview.SurfaceProvider? = null
     private val multiPreviewSurfaces: MutableMap<String, Surface?> = mutableMapOf()
 
+    /** Result of a session export operation */
     sealed interface ExportResult {
         data class Success(val uri: Uri) : ExportResult
 
         data class Failure(val message: String) : ExportResult
     }
 
+    /**
+     * Starts a recording session.
+     *
+     * Creates a new session directory, initializes IMU recording, and starts video/ARCore
+     * recording based on the selected mode. Implements a 1.5s warmup delay to allow camera
+     * autofocus and auto-exposure to stabilize before recording.
+     *
+     * @param mode Recording mode (ARCore or multi-camera)
+     * @param selectedCameraIds Camera IDs to record (for multi-camera mode only)
+     * @return Result indicating success/failure and optional status message
+     */
     suspend fun start(
         mode: RecordingMode,
         selectedCameraIds: List<String> = emptyList(),
@@ -115,6 +145,14 @@ class RecordingCoordinator(
             Result(true, arMessage)
         }
 
+    /**
+     * Stops the current recording session.
+     *
+     * Stops all active recorders (IMU, video, multi-camera, ARCore) and flushes data to disk.
+     * Safe to call even if no recording is in progress.
+     *
+     * @return Result indicating successful stop
+     */
     fun stop(): Result {
         imuRecorder?.stop()
         videoCapture?.stop()
@@ -136,15 +174,34 @@ class RecordingCoordinator(
         return Result(true)
     }
 
+    /**
+     * Updates the CameraX preview surface provider for single-camera video recording.
+     *
+     * @param provider CameraX surface provider from the preview composable
+     */
     fun updatePreviewSurfaceProvider(provider: androidx.camera.core.Preview.SurfaceProvider?) {
         android.util.Log.i("RecordingCoordinator", "Preview surface provider updated: ${if (provider != null) "READY" else "NULL"}")
         previewSurfaceProvider = provider
     }
 
+    /**
+     * Updates a preview surface for multi-camera recording.
+     *
+     * @param cameraId The camera ID to associate with this surface
+     * @param surface The preview surface or null to clear
+     */
     fun updateMultiPreviewSurface(cameraId: String, surface: Surface?) {
         multiPreviewSurfaces[cameraId] = surface
     }
 
+    /**
+     * Exports the most recent recording session as a ZIP file.
+     *
+     * Finds the latest session directory by modification time, zips all files,
+     * and returns a shareable content URI.
+     *
+     * @return ExportResult.Success with URI or ExportResult.Failure with error message
+     */
     suspend fun exportLatest(): ExportResult =
         withContext(Dispatchers.IO) {
             val sessionsRoot = context.getExternalFilesDir(null) ?: context.filesDir

@@ -21,12 +21,31 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/**
+ * Controls single-camera video recording using CameraX.
+ *
+ * Manages CameraX lifecycle, binds the camera to the process lifecycle,
+ * and handles video recording with optional preview. Records at highest
+ * available quality using the default back camera.
+ *
+ * @property context Application context for CameraX initialization
+ */
 class VideoCaptureController(private val context: Context) {
     private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
     private var cameraProvider: ProcessCameraProvider? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var activeRecording: Recording? = null
 
+    /**
+     * Starts video recording.
+     *
+     * Binds CameraX to the process lifecycle, configures the camera with
+     * optional preview, and begins recording to the specified file.
+     *
+     * @param outputFile File to write video output
+     * @param surfaceProvider Optional preview surface provider for displaying camera feed
+     * @return Video start timestamp in nanoseconds (SystemClock.elapsedRealtimeNanos)
+     */
     suspend fun start(
         outputFile: File,
         surfaceProvider: Preview.SurfaceProvider?,
@@ -62,6 +81,11 @@ class VideoCaptureController(private val context: Context) {
             startTimeNanos
         }
 
+    /**
+     * Stops video recording and unbinds the camera.
+     *
+     * Safe to call even if recording is not active.
+     */
     fun stop() {
         activeRecording?.stop()
         activeRecording = null
@@ -70,6 +94,15 @@ class VideoCaptureController(private val context: Context) {
     }
 }
 
+/**
+ * Suspends until a ListenableFuture completes.
+ *
+ * Converts Guava's ListenableFuture to Kotlin's coroutine-based suspension.
+ *
+ * @param executor Executor for the completion listener
+ * @return The result value from the future
+ * @throws Throwable if the future completes exceptionally
+ */
 private suspend fun <T> com.google.common.util.concurrent.ListenableFuture<T>.await(executor: Executor): T =
     suspendCancellableCoroutine { cont ->
         addListener({

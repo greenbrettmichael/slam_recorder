@@ -24,18 +24,39 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * Minimal ARCore recorder that:
- * 1. Records camera poses to CSV
- * 2. Manages ARCore texture for preview rendering
- * 3. No video encoding, no CameraX - just pose data + texture
+ * Records ARCore camera pose tracking data without video encoding.
+ *
+ * Manages ARCore session lifecycle and OpenGL ES context for camera texture management.
+ * Records 6-DOF pose data (position + orientation) at ~30Hz, skipping initial frames
+ * with unreliable tracking and filtering by tracking state.
+ *
+ * Implementation details:
+ * - Runs ARCore on dedicated GL thread (newSingleThreadContext)
+ * - Creates offscreen pbuffer surface for GL context
+ * - Generates external texture for ARCore camera feed
+ * - Skips first 10 frames to avoid initialization artifacts
+ * - Only writes poses when tracking state is TRACKING
+ *
+ * Output format: timestamp (seconds), px, py, pz, qx, qy, qz, qw
+ *
+ * @property context Application context for ARCore initialization
+ * @property poseWriter CSV writer for pose data output
+ * @property scope Coroutine scope for pose recording loop
  */
 class SimpleArCoreRecorder(
     private val context: Context,
     private val poseWriter: CsvBufferedWriter,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
 ) {
+    /**
+     * Result of ARCore session start attempt.
+     *
+     * @property success Whether ARCore started successfully
+     * @property message Error or warning message if applicable
+     */
     data class StartResult(val success: Boolean, val message: String? = null)
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.DelicateCoroutinesApi::class)
     private val glDispatcher = newSingleThreadContext("SimpleArCoreGl")
     
     private var session: Session? = null
@@ -46,11 +67,26 @@ class SimpleArCoreRecorder(
     private var cameraTextureId: Int = 0
 
     /**
-     * The camera texture ID that ARCore updates each frame.
-     * Can be used to render preview.
+     * Returns the OpenGL texture ID for the ARCore camera feed.
+     *
+     * This external texture (GL_TEXTURE_EXTERNAL_OES) is updated by ARCore
+     * each frame and can be used for preview rendering.
+     *
+     * @return OpenGL texture ID, or 0 if not yet initialized
      */
     fun getCameraTextureId(): Int = cameraTextureId
 
+    /**
+     * Starts ARCore session and pose recording.
+     *
+     * Initialization sequence:
+     * 1. Check ARCore availability and version
+     * 2. Set up OpenGL ES 2.0 context on dedicated thread
+     * 3. Create ARCore session with external texture
+     * 4. Start pose recording loop
+     *
+     * @return StartResult with success status and optional error message
+     */
     suspend fun start(): StartResult =
         withContext(Dispatchers.Default) {
             val availability = ArCoreApk.getInstance().checkAvailability(context)
@@ -102,6 +138,12 @@ class SimpleArCoreRecorder(
             }
         }
 
+    /**
+     * Stops ARCore recording and releases all resources.
+     *
+     * Cancels pose recording loop, pauses/closes ARCore session,
+     * tears down GL context, and flushes pose data to disk.
+     */
     suspend fun stop() {
         poseJob?.cancel()
         poseJob = null

@@ -22,8 +22,19 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Simple dual-camera (max 2) recorder using Camera2 and MediaRecorder per camera.
- * Preview is not provided; goal is simultaneous recording to separate files.
+ * Manages simultaneous multi-camera video recording using Camera2 API.
+ *
+ * Supports up to 2 cameras recording simultaneously using MediaRecorder for each camera.
+ * Handles both independent cameras and physical sub-cameras from logical multi-cameras.
+ * Uses SessionConfiguration API on Android P+ for physical camera targeting.
+ *
+ * Recording strategy:
+ * - Independent cameras: Each opened and recorded separately
+ * - Physical cameras from same parent: Opened via parent logical camera with physical targeting
+ * - Single physical camera: Opened via parent logical camera
+ *
+ * @property context Application context for MediaRecorder
+ * @property cameraManager Camera2 API manager
  */
 class MultiCameraCaptureController(
     private val context: Context,
@@ -36,6 +47,14 @@ class MultiCameraCaptureController(
     private val captureSessions = mutableListOf<CameraCaptureSession>()
     private val recorders = mutableListOf<MediaRecorder>()
 
+    /**
+     * Specification for a single camera recording.
+     *
+     * @property cameraId Physical or logical camera ID to record
+     * @property outputFile Destination video file
+     * @property previewSurface Optional surface for preview rendering
+     * @property parentLogicalCameraId Parent logical camera ID if this is a physical sub-camera
+     */
     data class CamSpec(
         val cameraId: String,
         val outputFile: File,
@@ -43,6 +62,17 @@ class MultiCameraCaptureController(
         val parentLogicalCameraId: String? = null,
     )
 
+    /**
+     * Starts multi-camera recording.
+     *
+     * Analyzes camera relationships and chooses appropriate recording strategy:
+     * - Independent cameras recorded separately
+     * - Physical cameras from same logical parent recorded together via physical camera API
+     *
+     * @param cameras List of camera specifications (max 2)
+     * @return true if all cameras started successfully, false otherwise
+     * @throws IllegalStateException if more than 2 cameras provided
+     */
     suspend fun start(cameras: List<CamSpec>): Boolean {
         if (cameras.isEmpty()) return false
         if (cameras.size > 2) error("Only up to 2 cameras supported")
@@ -149,6 +179,12 @@ class MultiCameraCaptureController(
         recorders.forEach { it.start() }
     }
 
+    /**
+     * Stops all active recordings and releases resources.
+     *
+     * Idempotent - safe to call multiple times. Suppresses exceptions during
+     * cleanup to ensure all resources are released.
+     */
     fun stop() {
         if (!stopped.compareAndSet(false, true)) return
         recorders.forEach { r ->
