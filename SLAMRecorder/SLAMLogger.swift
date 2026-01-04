@@ -38,12 +38,14 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
     // MARK: - Initialization
 
-    init(multiCamRecorder: MultiCamRecording = if #available(iOS 13.0, *) {
-        MultiCamRecorder()
-    } else {
-        NoopMultiCamRecorder()
-    }) {
-        self.multiCamRecorder = multiCamRecorder
+    init(multiCamRecorder: MultiCamRecording? = nil) {
+        if let recorder = multiCamRecorder {
+            self.multiCamRecorder = recorder
+        } else if #available(iOS 13.0, *) {
+            self.multiCamRecorder = MultiCamRecorder()
+        } else {
+            self.multiCamRecorder = NoopMultiCamRecorder()
+        }
         super.init()
         // Configure the session hosted by the view
         sceneView.session.delegate = self

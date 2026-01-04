@@ -72,4 +72,66 @@ final class VideoRecorderTests: XCTestCase {
         let fileSize = attributes?[.size] as? Int64 ?? 0
         XCTAssertGreaterThan(fileSize, 0)
     }
+
+    func testSetPreferredStartTime() {
+        let recorder = VideoRecorder()
+        guard recorder.setup(url: tempURL, width: 640, height: 480) else {
+            XCTFail("Setup failed")
+            return
+        }
+
+        let startTime = CMTime(seconds: 10.0, preferredTimescale: 600)
+        recorder.setPreferredStartTime(startTime)
+
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
+        ] as CFDictionary
+
+        let status = CVPixelBufferCreate(kCFAllocatorDefault, 640, 480, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+        XCTAssertEqual(status, kCVReturnSuccess)
+
+        if let buffer = pixelBuffer {
+            recorder.append(pixelBuffer: buffer, timestamp: 10.0)
+        }
+
+        let expectation = expectation(description: "Finish completion called")
+        recorder.finish {
+            expectation.fulfill()
+        }
+        waitForExpectations(timeout: 2.0)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tempURL.path))
+    }
+
+    func testFinishWithoutSetup() {
+        let recorder = VideoRecorder()
+        XCTAssertFalse(recorder.isWriting)
+
+        let expectation = expectation(description: "Finish completion called")
+        recorder.finish {
+            expectation.fulfill()
+        }
+        waitForExpectations(timeout: 1.0)
+    }
+
+    func testMultipleFinishCalls() {
+        let recorder = VideoRecorder()
+        _ = recorder.setup(url: tempURL, width: 640, height: 480)
+
+        let expectation1 = expectation(description: "First finish")
+        recorder.finish {
+            expectation1.fulfill()
+        }
+        waitForExpectations(timeout: 2.0)
+
+        let expectation2 = expectation(description: "Second finish")
+        recorder.finish {
+            expectation2.fulfill()
+        }
+        waitForExpectations(timeout: 1.0)
+
+        XCTAssertFalse(recorder.isWriting)
+    }
 }

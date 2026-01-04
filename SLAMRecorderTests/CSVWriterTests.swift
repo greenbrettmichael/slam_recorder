@@ -48,4 +48,37 @@ final class CSVWriterTests: XCTestCase {
         let writer = CSVWriter(url: invalidURL, header: "header")
         XCTAssertNil(writer)
     }
+
+    func testMultipleWrites() {
+        let header = "a,b,c\n"
+        let writer = CSVWriter(url: tempURL, header: header)
+        XCTAssertNotNil(writer)
+        for i in 1 ... 100 {
+            writer?.write(row: "\(i),\(i * 2),\(i * 3)\n")
+        }
+        writer?.close()
+        let content = try? String(contentsOf: tempURL, encoding: .utf8)
+        let lines = content?.components(separatedBy: "\n").filter { !$0.isEmpty }
+        XCTAssertEqual(lines?.count, 101)
+    }
+
+    func testCloseMultipleTimes() {
+        let header = "test\n"
+        let writer = CSVWriter(url: tempURL, header: header)
+        writer?.write(row: "data\n")
+        writer?.close()
+        writer?.close()
+        let content = try? String(contentsOf: tempURL, encoding: .utf8)
+        XCTAssertEqual(content, "test\ndata\n")
+    }
+
+    func testWriteAfterClose() {
+        let header = "test\n"
+        let writer = CSVWriter(url: tempURL, header: header)
+        writer?.write(row: "before\n")
+        writer?.close()
+        writer?.write(row: "after\n")
+        let content = try? String(contentsOf: tempURL, encoding: .utf8)
+        XCTAssertEqual(content, "test\nbefore\n")
+    }
 }

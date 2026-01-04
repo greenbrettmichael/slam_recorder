@@ -66,7 +66,7 @@ struct ContentView: View {
         .onAppear {
             logger.startMonitoring()
         }
-        .onChange(of: logger.recordingMode) { _ in
+        .onChange(of: logger.recordingMode) {
             logger.startMonitoring()
         }
     }

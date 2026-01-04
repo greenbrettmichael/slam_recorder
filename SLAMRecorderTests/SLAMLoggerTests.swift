@@ -89,6 +89,63 @@ final class SLAMLoggerTests: XCTestCase {
             XCTFail("Failed to list directories: \(error)")
         }
     }
+
+    func testMultipleStartCalls() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertTrue(mockMultiCam.startCalled)
+        XCTAssertTrue(logger.isRecording)
+
+        // Create a new mock to verify second start is ignored
+        let secondMock = MockMultiCamRecorder()
+        logger = SLAMLogger(multiCamRecorder: secondMock)
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        logger.stopRecording()
+    }
+
+    func testStopWithoutStart() {
+        XCTAssertFalse(logger.isRecording)
+        logger.stopRecording()
+        XCTAssertFalse(logger.isRecording)
+    }
+
+    func testMultipleStopCalls() {
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        logger.stopRecording()
+        XCTAssertFalse(logger.isRecording)
+        logger.stopRecording()
+        XCTAssertFalse(logger.isRecording)
+    }
+
+    func testSwitchRecordingModeBetweenSessions() {
+        logger.recordingMode = .arkit
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        logger.stopRecording()
+        XCTAssertFalse(logger.isRecording)
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        logger.stopRecording()
+        XCTAssertFalse(logger.isRecording)
+    }
+
+    func testMultiCamFailureHandling() {
+        mockMultiCam.shouldStartSucceed = false
+        logger.recordingMode = .multiCamera
+        logger.selectedCameras = [.backWide]
+        logger.startRecording()
+        XCTAssertFalse(logger.isRecording)
+    }
 }
 
 // MARK: - Test Doubles
@@ -100,6 +157,15 @@ final class MockMultiCamRecorder: MultiCamRecording {
     private(set) var lastDirectory: URL?
     var isRecording: Bool = false
     var shouldStartSucceed: Bool = true
+
+    func reset() {
+        startCalled = false
+        stopCalled = false
+        lastCameras = []
+        lastDirectory = nil
+        isRecording = false
+        shouldStartSucceed = true
+    }
 
     func makePreviewLayer() -> AVCaptureVideoPreviewLayer? { nil }
 
