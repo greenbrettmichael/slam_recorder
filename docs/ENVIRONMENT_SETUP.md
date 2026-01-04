@@ -61,3 +61,11 @@ If Sweetpad or VS Code does not pick up the environment variables:
     code .
     ```
 3.  **Check Sweetpad Settings**: Ensure Sweetpad is using the correct shell or that the environment is propagated.
+
+## Android Setup (Command Line + VS Code)
+
+1. Install Java 17 (e.g., `brew install openjdk@17` on macOS or your distro package on Linux).
+2. Install Android command-line tools and set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to the SDK path.
+3. Install platform tools and build-tools via `sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"`.
+4. In VS Code, add the Kotlin and Gradle extensions for syntax and task integration.
+5. From [android](../android), run `./gradlew tasks` to verify the toolchain.

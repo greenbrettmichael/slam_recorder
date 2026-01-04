@@ -152,6 +152,39 @@ pixi run python extract_frames.py path/to/video.mov path/to/output_folder
 pixi run extract sessions/session_2026-01-03_15-30-45-123/video.mov extracted_frames/
 ```
 
+## Android (Compose/CameraX/ARCore)
+
+An Android sibling app lives in [android](android) using Kotlin, Jetpack Compose, CameraX/Camera2, ARCore, SensorManager, Kover for coverage, and Spotless/ktlint for formatting. It is optimized for VS Code on macOS/Linux (Android Studio not required).
+
+### Prerequisites
+
+- Java 17 (Gradle/AGP toolchain)
+- Android SDK command-line tools with `ANDROID_HOME`/`ANDROID_SDK_ROOT` set and platform tools installed (API 35 recommended)
+- VS Code extensions: Kotlin, Gradle, and basic Android syntax highlighting
+
+### Build, Lint, and Test
+
+```bash
+cd android
+
+# Format check
+./gradlew spotlessCheck
+
+# Assemble debug build
+./gradlew :app:assembleDebug
+
+# Unit tests + Robolectric
+./gradlew :app:testDebugUnitTest
+
+# Coverage (Kover)
+./gradlew :app:koverXmlReport
+```
+
+### Multi-camera UX
+
+- Multi-camera support is detected at startup via Camera2 logical camera capabilities.
+- If unsupported, the Compose screen shows a clear message and disables the multi-camera mode toggle; ARCore-only mode remains available.
+
 ## Development
 
 ### Code Quality

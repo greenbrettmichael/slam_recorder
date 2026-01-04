@@ -47,3 +47,15 @@ ViewInspector is used to test SwiftUI view structures:
 ## Notes
 
 - Camera-related code (`MultiCamRecorder`) has low coverage because it requires physical camera hardware
+
+## Android Coverage (Kover)
+
+The Android app uses the Kotlin-first Kover plugin for coverage.
+
+```bash
+cd android
+./gradlew :app:testDebugUnitTest :app:koverXmlReport
+```
+
+- XML report path: `android/app/build/reports/kover/xml/report.xml`
+- Upload this artifact in CI for PR checks.

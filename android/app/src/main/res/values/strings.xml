@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">SLAM Recorder</string>
+    <string name="multi_camera_supported">Multi-camera supported</string>
+    <string name="multi_camera_unsupported">Multi-camera not supported on this device</string>
+    <string name="start_recording">Start Recording</string>
+    <string name="stop_recording">Stop Recording</string>
+</resources>

@@ -1,4 +1,4 @@
-name: iOS CI
+name: CI
 
 on:
   push:
@@ -110,3 +110,44 @@ jobs:
             coverage.json
             coverage_report.txt
             ./DerivedData/Logs/Test/*.xcresult
+
+  android-build-test:
+    name: Android Build, Lint, Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: "latest"
+          components: |-
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+
+      - name: Gradle Wrapper Validation
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Build and Test
+        run: ./gradlew spotlessCheck :app:assembleDebug :app:testDebugUnitTest :app:koverXmlReport
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: |
+            android/app/build/reports/tests/testDebugUnitTest
+            android/app/build/reports/kover/xml/report.xml
