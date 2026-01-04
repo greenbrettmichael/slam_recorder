@@ -29,4 +29,11 @@ data class SessionFiles(
             )
         }
     }
+
+    /**
+     * Helper for multi-camera: builds a deterministic file name per camera id.
+     */
+    fun videoFileForCamera(cameraId: String): File = File(root, "video_$cameraId.mp4")
+
+    fun videoStartFileForCamera(cameraId: String): File = File(root, "video_start_time_$cameraId.txt")
 }

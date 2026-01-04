@@ -28,6 +28,7 @@ import dev.slamrecorder.android.recording.RecordingMode
 fun recorderScreen(
     state: RecorderUiState,
     onModeSelected: (RecordingMode) -> Unit,
+    onCameraToggle: (String) -> Unit,
     onToggleRecording: () -> Unit,
     onExportLatest: () -> Unit = {},
     onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit = {},
@@ -84,7 +85,18 @@ fun recorderScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                cameraPreview(onPreviewReady = onPreviewReady)
+                if (state.selectedMode == RecordingMode.MULTI_CAMERA) {
+                    Text(
+                        text = "Multi-camera preview not shown; select up to 2 cameras below.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                } else {
+                    cameraPreview(onPreviewReady = onPreviewReady)
+                }
+
+                if (state.selectedMode == RecordingMode.MULTI_CAMERA) {
+                    cameraSelectorList(state, onCameraToggle)
+                }
 
                 Text(
                     text = if (state.isRecording) "Recording..." else "Idle",
@@ -94,7 +106,9 @@ fun recorderScreen(
                 Button(
                     onClick = onToggleRecording,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = state.selectedMode != RecordingMode.MULTI_CAMERA || state.multiCamSupported,
+                    enabled =
+                        state.selectedMode != RecordingMode.MULTI_CAMERA ||
+                            (state.multiCamSupported && state.selectedCameraIds.isNotEmpty()),
                 ) {
                     Text(text = if (state.isRecording) "Stop Recording" else "Start Recording")
                 }
@@ -138,6 +152,32 @@ private fun cameraPreview(onPreviewReady: (androidx.camera.core.Preview.SurfaceP
 }
 
 @Composable
+private fun cameraSelectorList(
+    state: RecorderUiState,
+    onCameraToggle: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text = "Select up to 2 cameras:", style = MaterialTheme.typography.titleSmall)
+        state.availableCameras.forEach { cam ->
+            val selected = state.selectedCameraIds.contains(cam.id)
+            FilterChip(
+                selected = selected,
+                onClick = { onCameraToggle(cam.id) },
+                label = { Text(cam.label) },
+                enabled = true,
+            )
+        }
+        if (state.selectedCameraIds.size > 2) {
+            Text(
+                text = "Limit 2 cameras at once.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+@Composable
 private fun modeSelector(
     selectedMode: RecordingMode,
     multiCamSupported: Boolean,
@@ -172,6 +212,7 @@ private fun recorderScreenPreview() {
                     supportMessage = "Multi-camera not supported",
                 ),
             onModeSelected = {},
+            onCameraToggle = {},
             onToggleRecording = {},
         )
     }

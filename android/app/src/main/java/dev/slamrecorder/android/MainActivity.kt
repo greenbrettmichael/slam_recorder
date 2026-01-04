@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.slamrecorder.android.recording.CameraEnumerator
 import dev.slamrecorder.android.recording.MultiCamSupportChecker
 import dev.slamrecorder.android.recording.RecordingCoordinator
 import dev.slamrecorder.android.recording.RecordingViewModel
@@ -35,17 +36,19 @@ class MainActivity : ComponentActivity() {
 
         val cameraManager = getSystemService(CAMERA_SERVICE) as CameraManager
         val sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        val recordingCoordinator = RecordingCoordinator(applicationContext, sensorManager)
+        val recordingCoordinator = RecordingCoordinator(applicationContext, sensorManager, cameraManager)
         val supportChecker = MultiCamSupportChecker(cameraManager)
+        val cameraEnumerator = CameraEnumerator(cameraManager)
 
         setContent {
-            val viewModel: RecordingViewModel = viewModel(factory = recordingViewModelFactory(supportChecker, recordingCoordinator))
+            val viewModel: RecordingViewModel = viewModel(factory = recordingViewModelFactory(supportChecker, cameraEnumerator, recordingCoordinator))
             val state by viewModel.uiState.collectAsState()
 
             appTheme {
                 recorderScreen(
                     state = state,
                     onModeSelected = viewModel::selectMode,
+                    onCameraToggle = viewModel::toggleCameraSelection,
                     onToggleRecording = viewModel::toggleRecording,
                     onExportLatest = { exportLatestSession(recordingCoordinator) },
                     onPreviewReady = viewModel::setPreviewSurfaceProvider,
@@ -94,11 +97,12 @@ class MainActivity : ComponentActivity() {
 
     private fun recordingViewModelFactory(
         supportChecker: MultiCamSupportChecker,
+        cameraEnumerator: CameraEnumerator,
         coordinator: RecordingCoordinator,
     ): ViewModelProvider.Factory =
         object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return RecordingViewModel(supportChecker, coordinator) as T
+                return RecordingViewModel(supportChecker, cameraEnumerator, coordinator) as T
             }
         }
 }

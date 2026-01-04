@@ -20,6 +20,7 @@ import java.util.zip.ZipOutputStream
 class RecordingCoordinator(
     private val context: Context,
     private val sensorManager: SensorManager,
+    private val cameraManager: android.hardware.camera2.CameraManager,
 ) {
     data class Result(val success: Boolean, val message: String? = null)
 
@@ -29,6 +30,7 @@ class RecordingCoordinator(
     private var imuRecorder: ImuRecorder? = null
     private var arCoreRecorder: SimpleArCoreRecorder? = null
     private var videoCapture: VideoCaptureController? = null
+    private var multiCameraCapture: MultiCameraCaptureController? = null
     private var previewSurfaceProvider: androidx.camera.core.Preview.SurfaceProvider? = null
 
     sealed interface ExportResult {
@@ -37,7 +39,10 @@ class RecordingCoordinator(
         data class Failure(val message: String) : ExportResult
     }
 
-    suspend fun start(mode: RecordingMode): Result =
+    suspend fun start(
+        mode: RecordingMode,
+        selectedCameraIds: List<String> = emptyList(),
+    ): Result =
         withContext(Dispatchers.Default) {
             if (sessionFiles != null) return@withContext Result(false, "Recording already in progress")
 
@@ -59,9 +64,28 @@ class RecordingCoordinator(
                 }
             }
 
-            videoCapture = VideoCaptureController(context)
-            val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
-            files.videoStartFile.writeText(videoStartNanos.toString())
+            if (mode == RecordingMode.MULTI_CAMERA) {
+                // Multi-camera: record up to two cameras simultaneously (no preview for now)
+                val ids = selectedCameraIds.take(2)
+                if (ids.isEmpty()) {
+                    return@withContext Result(false, "No cameras selected")
+                }
+                val multi = MultiCameraCaptureController(context, cameraManager)
+                multiCameraCapture = multi
+                val camFiles = ids.map { id -> id to files.videoFileForCamera(id) }
+                val started = multi.start(camFiles)
+                if (!started) {
+                    multi.stop()
+                    return@withContext Result(false, "Failed to start multi-camera recording")
+                }
+                camFiles.forEach { (id, _) ->
+                    files.videoStartFileForCamera(id).writeText(System.nanoTime().toString())
+                }
+            } else {
+                videoCapture = VideoCaptureController(context)
+                val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
+                files.videoStartFile.writeText(videoStartNanos.toString())
+            }
 
             sessionFiles = files
             Result(true, arMessage)
@@ -70,9 +94,11 @@ class RecordingCoordinator(
     fun stop(): Result {
         imuRecorder?.stop()
         videoCapture?.stop()
+        multiCameraCapture?.stop()
         sessionFiles = null
         imuRecorder = null
         videoCapture = null
+        multiCameraCapture = null
         
         // Stop ARCore recorder in a coroutine since it's suspend
         val toStop = arCoreRecorder

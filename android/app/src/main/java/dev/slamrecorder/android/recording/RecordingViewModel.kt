@@ -16,10 +16,13 @@ data class RecorderUiState(
     val multiCamSupported: Boolean = false,
     val supportMessage: String = "",
     val statusMessage: String = "",
+    val availableCameras: List<CameraOption> = emptyList(),
+    val selectedCameraIds: Set<String> = emptySet(),
 )
 
 class RecordingViewModel(
     private val supportChecker: MultiCamSupportChecker,
+    private val cameraEnumerator: CameraEnumerator,
     private val coordinator: RecordingCoordinator?,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RecorderUiState())
@@ -27,6 +30,7 @@ class RecordingViewModel(
 
     init {
         refreshMultiCameraSupport()
+        refreshCameraList()
     }
 
     fun refreshMultiCameraSupport() {
@@ -37,6 +41,31 @@ class RecordingViewModel(
                 supportMessage = if (supported) "" else MULTI_CAM_UNSUPPORTED,
                 selectedMode = if (supported) state.selectedMode else RecordingMode.AR_CORE,
             )
+        }
+    }
+
+    fun refreshCameraList() {
+        val cams = cameraEnumerator.listCameraOptions()
+        _uiState.update { state ->
+            state.copy(
+                availableCameras = cams,
+                // Default to first back camera if nothing selected
+                selectedCameraIds = if (state.selectedCameraIds.isEmpty() && cams.isNotEmpty())
+                    setOf(cams.first().id) else state.selectedCameraIds,
+            )
+        }
+    }
+
+    fun toggleCameraSelection(id: String) {
+        _uiState.update { state ->
+            val current = state.selectedCameraIds
+            val next =
+                if (current.contains(id)) {
+                    current - id
+                } else {
+                    if (current.size >= 2) current else current + id
+                }
+            state.copy(selectedCameraIds = next)
         }
     }
 
@@ -66,7 +95,8 @@ class RecordingViewModel(
     private fun startRecording() {
         viewModelScope.launch {
             val mode = _uiState.value.selectedMode
-            val result = coordinator?.start(mode)
+            val selected = _uiState.value.selectedCameraIds.toList()
+            val result = coordinator?.start(mode, selected)
             _uiState.update { state ->
                 state.copy(
                     isRecording = true,
