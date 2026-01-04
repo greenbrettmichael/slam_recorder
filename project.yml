@@ -1,4 +1,8 @@
 name: SLAMRecorder
+packages:
+  ViewInspector:
+    url: https://github.com/nalexn/ViewInspector
+    from: 0.10.0
 targets:
   SLAMRecorder:
     type: application
@@ -32,6 +36,7 @@ targets:
       - path: SLAMRecorderTests
     dependencies:
       - target: SLAMRecorder
+      - package: ViewInspector
     settings:
       GENERATE_INFOPLIST_FILE: YES
       PRODUCT_BUNDLE_IDENTIFIER: com.brett.SLAMRecorderTests
