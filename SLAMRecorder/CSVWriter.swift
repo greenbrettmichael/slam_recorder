@@ -65,7 +65,7 @@ class CSVWriter {
     }
 
     private func flushBuffer() {
-        guard !writeBuffer.isEmpty, fileHandle != nil else { return }
+        guard !writeBuffer.isEmpty, let fileHandle = fileHandle else { return }
 
         let bufferToFlush = writeBuffer
         writeBuffer.removeAll(keepingCapacity: true)
@@ -80,8 +80,20 @@ class CSVWriter {
 
     /// Closes the file handle and flushes any remaining buffered data.
     func close() {
-        // Final flush of any remaining data
-        flushBuffer()
+        // Wait for any pending writes to complete
+        writeQueue.sync {
+            // Final flush of any remaining data
+            guard !writeBuffer.isEmpty, let fileHandle = fileHandle else { return }
+
+            let bufferToFlush = writeBuffer
+            writeBuffer.removeAll(keepingCapacity: true)
+
+            for row in bufferToFlush {
+                if let data = row.data(using: .utf8) {
+                    fileHandle.write(data)
+                }
+            }
+        }
         try? fileHandle?.close()
         fileHandle = nil
     }
