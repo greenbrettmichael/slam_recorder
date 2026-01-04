@@ -151,3 +151,46 @@ jobs:
           path: |
             android/app/build/reports/tests/testDebugUnitTest
             android/app/build/reports/kover/xml/report.xml
+
+  android-emulator:
+    name: Android Emulator Smoke Tests
+    runs-on: macos-13
+    needs: android-build-test
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: "latest"
+          components: |-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Launch emulator and run connected tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          script: ./gradlew :app:connectedDebugAndroidTest
+
+      - name: Upload Instrumentation Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-reports
+          path: |
+            app/build/reports/androidTests/connected

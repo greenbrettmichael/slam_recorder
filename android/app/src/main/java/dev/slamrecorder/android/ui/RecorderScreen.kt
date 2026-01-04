@@ -1,5 +1,6 @@
 package dev.slamrecorder.android.ui
 
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import dev.slamrecorder.android.recording.RecorderUiState
 import dev.slamrecorder.android.recording.RecordingMode
 
@@ -27,6 +29,7 @@ fun recorderScreen(
     state: RecorderUiState,
     onModeSelected: (RecordingMode) -> Unit,
     onToggleRecording: () -> Unit,
+    onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit = {},
 ) {
     Column(
         modifier =
@@ -80,6 +83,8 @@ fun recorderScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                cameraPreview(onPreviewReady = onPreviewReady)
+
                 Text(
                     text = if (state.isRecording) "Recording..." else "Idle",
                     style = MaterialTheme.typography.titleMedium,
@@ -92,11 +97,37 @@ fun recorderScreen(
                 ) {
                     Text(text = if (state.isRecording) "Stop Recording" else "Start Recording")
                 }
+                if (state.statusMessage.isNotBlank()) {
+                    Text(
+                        text = state.statusMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
     }
+}
+
+@Composable
+private fun cameraPreview(onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit) {
+    AndroidView(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+        factory = { context ->
+            PreviewView(context).apply {
+                this.scaleType = PreviewView.ScaleType.FILL_CENTER
+            }
+        },
+        update = { previewView ->
+            val provider = previewView.surfaceProvider
+            onPreviewReady(provider)
+        },
+    )
 }
 
 @Composable

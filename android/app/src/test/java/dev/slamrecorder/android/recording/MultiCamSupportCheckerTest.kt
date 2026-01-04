@@ -36,6 +36,7 @@ class MultiCamSupportCheckerTest {
         val viewModel =
             RecordingViewModel(
                 FakeSupportChecker(supported = false),
+                coordinator = null,
             )
 
         viewModel.selectMode(RecordingMode.MULTI_CAMERA)
@@ -49,6 +50,7 @@ class MultiCamSupportCheckerTest {
         val viewModel =
             RecordingViewModel(
                 FakeSupportChecker(supported = true),
+                coordinator = null,
             )
 
         viewModel.selectMode(RecordingMode.MULTI_CAMERA)
