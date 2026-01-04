@@ -34,7 +34,7 @@ final class RecordingModeTests: XCTestCase {
     }
 
     func testNoopMultiCamRecorderStop() {
-        var noop = NoopMultiCamRecorder()
+        let noop = NoopMultiCamRecorder()
         noop.isRecording = true
         noop.stopRecording()
         XCTAssertFalse(noop.isRecording)
