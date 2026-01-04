@@ -29,6 +29,7 @@ fun recorderScreen(
     state: RecorderUiState,
     onModeSelected: (RecordingMode) -> Unit,
     onToggleRecording: () -> Unit,
+    onExportLatest: () -> Unit = {},
     onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit = {},
 ) {
     Column(
@@ -96,6 +97,12 @@ fun recorderScreen(
                     enabled = state.selectedMode != RecordingMode.MULTI_CAMERA || state.multiCamSupported,
                 ) {
                     Text(text = if (state.isRecording) "Stop Recording" else "Start Recording")
+                }
+                Button(
+                    onClick = onExportLatest,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(text = "Export Latest Session")
                 }
                 if (state.statusMessage.isNotBlank()) {
                     Text(
