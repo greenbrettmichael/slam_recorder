@@ -170,6 +170,7 @@ class MultiCameraCaptureController(
     }
 
     private fun createRecorder(outputFile: File): MediaRecorder {
+        @Suppress("DEPRECATION")
         return MediaRecorder().apply {
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)

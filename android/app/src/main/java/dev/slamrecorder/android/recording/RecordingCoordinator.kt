@@ -68,6 +68,16 @@ class RecordingCoordinator(
                 }
             }
 
+            // Start video capture for all modes except multi-camera
+            if (mode != RecordingMode.MULTI_CAMERA) {
+                // Warmup delay: let camera stabilize focus/exposure
+                kotlinx.coroutines.delay(1500)
+                
+                videoCapture = VideoCaptureController(context)
+                val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
+                files.videoStartFile.writeText(videoStartNanos.toString())
+            }
+
             if (mode == RecordingMode.MULTI_CAMERA) {
                 // Multi-camera: record up to two cameras simultaneously
                 val ids = selectedCameraIds.take(2)
@@ -78,6 +88,9 @@ class RecordingCoordinator(
                 // Look up camera options to determine if we need physical camera handling
                 val allOptions = cameraEnumerator.listCameraOptions()
                 val selectedOptions = ids.mapNotNull { id -> allOptions.find { opt -> opt.id == id } }
+                
+                // Warmup delay: let cameras stabilize focus/exposure
+                kotlinx.coroutines.delay(1500)
                 
                 val multi = MultiCameraCaptureController(context, cameraManager)
                 multiCameraCapture = multi
@@ -96,10 +109,6 @@ class RecordingCoordinator(
                     return@withContext Result(false, "Failed to start multi-camera recording")
                 }
                 files.videoStartFile.writeText(sharedStart.toString())
-            } else {
-                videoCapture = VideoCaptureController(context)
-                val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
-                files.videoStartFile.writeText(videoStartNanos.toString())
             }
 
             sessionFiles = files
