@@ -19,9 +19,33 @@ jobs:
       - name: Run Tests
         run: pixi run test
 
+  lint:
+    name: Lint (SwiftFormat & SwiftLint)
+    runs-on: macos-15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+
+      - name: SwiftFormat Lint Check
+        run: |
+          find SLAMRecorder SLAMRecorderTests -name "*.swift" | while read file; do
+            swiftformat --lint "$file" || exit 1
+          done
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: SwiftLint Check
+        run: swiftlint lint SLAMRecorder SLAMRecorderTests
+
   build-and-test:
     name: Build and Test
     runs-on: macos-15
+    needs: lint
     
     steps:
       - name: Checkout

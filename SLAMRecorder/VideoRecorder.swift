@@ -12,12 +12,12 @@ class VideoRecorder {
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var isSessionStarted = false
     private var preferredStartTime: CMTime?
-    
+
     /// Checks if the recorder is currently in a writing state.
     var isWriting: Bool {
-        return assetWriter?.status == .writing
+        assetWriter?.status == .writing
     }
-    
+
     /// Configures and prepares the video writer for recording.
     ///
     /// - Parameters:
@@ -32,25 +32,25 @@ class VideoRecorder {
             print("Failed to create asset writer: \(error)")
             return false
         }
-        
+
         let outputSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
-            AVVideoHeightKey: height
+            AVVideoHeightKey: height,
         ]
-        
+
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
-        guard let videoInput = videoInput else { return false }
-        
+        guard let videoInput else { return false }
+
         videoInput.expectsMediaDataInRealTime = true
-        
+
         pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput, sourcePixelBufferAttributes: nil)
-        
+
         if assetWriter?.canAdd(videoInput) == true {
             assetWriter?.add(videoInput)
             return assetWriter?.startWriting() ?? false
         }
-        
+
         return false
     }
 
@@ -58,7 +58,7 @@ class VideoRecorder {
     func setPreferredStartTime(_ time: CMTime) {
         preferredStartTime = time
     }
-    
+
     /// Appends a frame to the video.
     /// - Parameters:
     ///   - pixelBuffer: The image buffer.
@@ -67,17 +67,17 @@ class VideoRecorder {
         guard let writer = assetWriter, writer.status == .writing,
               let input = videoInput, input.isReadyForMoreMediaData,
               let adaptor = pixelBufferAdaptor else { return }
-        
+
         let cmTime = CMTime(seconds: timestamp, preferredTimescale: 600)
-        
+
         if !isSessionStarted {
             writer.startSession(atSourceTime: preferredStartTime ?? cmTime)
             isSessionStarted = true
         }
-        
+
         adaptor.append(pixelBuffer, withPresentationTime: cmTime)
     }
-    
+
     /// Finishes writing the video.
     /// - Parameter completion: Called when writing is finished.
     func finish(completion: @escaping () -> Void) {
@@ -85,7 +85,7 @@ class VideoRecorder {
             completion()
             return
         }
-        
+
         videoInput?.markAsFinished()
         writer.finishWriting { [weak self] in
             self?.assetWriter = nil

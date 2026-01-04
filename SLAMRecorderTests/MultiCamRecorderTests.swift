@@ -1,5 +1,5 @@
-import XCTest
 @testable import SLAMRecorder
+import XCTest
 
 @available(iOS 13.0, *)
 final class MultiCamRecorderTests: XCTestCase {
@@ -12,7 +12,7 @@ final class MultiCamRecorderTests: XCTestCase {
         XCTAssertEqual(urls[.backWide]?.lastPathComponent, "camera_back_wide.mov")
         XCTAssertEqual(urls[.front]?.lastPathComponent, "camera_front.mov")
     }
-    
+
     func testMakeOutputURLsStableFileNames() {
         let dir = URL(fileURLWithPath: "/tmp")
         let urls = MultiCamRecorder.makeOutputURLs(for: [.backTelephoto], in: dir)

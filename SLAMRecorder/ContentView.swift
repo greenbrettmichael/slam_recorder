@@ -1,11 +1,11 @@
-import SwiftUI
 import ARKit
 import SceneKit
+import SwiftUI
 
 struct ContentView: View {
     // We now initialize SLAMLogger instead of ARManager
     @StateObject var logger = SLAMLogger()
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             if logger.recordingMode == .arkit {
@@ -15,7 +15,7 @@ struct ContentView: View {
                 MultiCamPreviewContainer(logger: logger)
                     .edgesIgnoringSafeArea(.all)
             }
-            
+
             VStack(spacing: 20) {
                 // Mode picker
                 Picker("Mode", selection: $logger.recordingMode) {
@@ -25,12 +25,12 @@ struct ContentView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
-                
-                if logger.recordingMode == .multiCamera && !logger.isRecording {
+
+                if logger.recordingMode == .multiCamera, !logger.isRecording {
                     CameraSelectionView(selected: $logger.selectedCameras)
                     Text("Up to two cameras are recorded simultaneously (prioritizing Back Wide, then Front).").font(.footnote).foregroundColor(.white).padding(.horizontal)
                 }
-                
+
                 // Status Overlay
                 VStack {
                     Text(logger.isRecording ? "● RECORDING" : "STANDBY")
@@ -41,9 +41,9 @@ struct ContentView: View {
                 .background(Color.black.opacity(0.7))
                 .cornerRadius(10)
                 .padding(.top, 50)
-                
+
                 Spacer()
-                
+
                 // Record Button
                 Button(action: {
                     if logger.isRecording {
@@ -75,19 +75,19 @@ struct ContentView: View {
 // Helper to bridge the ARSCNView from our Logger to SwiftUI
 struct ARViewContainer: UIViewRepresentable {
     @ObservedObject var logger: SLAMLogger
-    
-    func makeUIView(context: Context) -> ARSCNView {
-        return logger.sceneView
+
+    func makeUIView(context _: Context) -> ARSCNView {
+        logger.sceneView
     }
-    
-    func updateUIView(_ uiView: ARSCNView, context: Context) {}
+
+    func updateUIView(_: ARSCNView, context _: Context) {}
 }
 
 /// Live preview for multi-camera recording using the multi-cam session's preview layer.
 struct MultiCamPreviewContainer: UIViewRepresentable {
     @ObservedObject var logger: SLAMLogger
-    
-    func makeUIView(context: Context) -> UIView {
+
+    func makeUIView(context _: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .black
         if let layer = logger.multiCamPreviewLayer() {
@@ -96,8 +96,8 @@ struct MultiCamPreviewContainer: UIViewRepresentable {
         }
         return view
     }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {
+
+    func updateUIView(_ uiView: UIView, context _: Context) {
         if let layer = logger.multiCamPreviewLayer() {
             layer.frame = uiView.bounds
             if layer.superlayer == nil {
@@ -110,7 +110,7 @@ struct MultiCamPreviewContainer: UIViewRepresentable {
 /// Camera selection view for multi-cam recording.
 struct CameraSelectionView: View {
     @Binding var selected: Set<CameraID>
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Cameras")
@@ -125,7 +125,7 @@ struct CameraSelectionView: View {
                         } else {
                             selected.remove(camera)
                         }
-                    }
+                    },
                 ))
                 .toggleStyle(SwitchToggleStyle(tint: .green))
                 .foregroundColor(.white)

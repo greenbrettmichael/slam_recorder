@@ -1,0 +1,25 @@
+disabled_rules:
+  - trailing_whitespace
+  - trailing_semicolon
+  - trailing_comma
+  - multiple_closures_with_trailing_closure
+
+opt_in_rules:
+  - closure_end_indentation
+  - closure_spacing
+  - explicit_init
+  - first_where
+  - joined_default_parameter
+  - overridden_super_call
+  - sorted_imports
+
+excluded:
+  - .build
+  - .swiftpm
+  - SLAMRecorder.xcodeproj
+
+line_length: 120
+identifier_name:
+  min_length: 1
+vertical_whitespace:
+  max_empty_lines: 2

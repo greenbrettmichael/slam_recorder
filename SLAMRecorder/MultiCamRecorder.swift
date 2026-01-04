@@ -8,44 +8,43 @@ enum CameraID: CaseIterable, Hashable {
     case backUltraWide
     case backTelephoto
     case front
-    
+
     var fileNameComponent: String {
         switch self {
-        case .backWide: return "back_wide"
-        case .backUltraWide: return "back_ultrawide"
-        case .backTelephoto: return "back_tele"
-        case .front: return "front"
+        case .backWide: "back_wide"
+        case .backUltraWide: "back_ultrawide"
+        case .backTelephoto: "back_tele"
+        case .front: "front"
         }
     }
-    
+
     var displayName: String {
         switch self {
-        case .backWide: return "Back Wide"
-        case .backUltraWide: return "Back Ultra-Wide"
-        case .backTelephoto: return "Back Telephoto"
-        case .front: return "Front"
+        case .backWide: "Back Wide"
+        case .backUltraWide: "Back Ultra-Wide"
+        case .backTelephoto: "Back Telephoto"
+        case .front: "Front"
         }
     }
-    
+
     var position: AVCaptureDevice.Position {
         switch self {
-        case .front: return .front
-        default: return .back
+        case .front: .front
+        default: .back
         }
     }
-    
+
     /// Resolves the appropriate capture device for this camera identifier.
     func resolveDevice() -> AVCaptureDevice? {
-        let deviceTypes: [AVCaptureDevice.DeviceType]
-        switch self {
+        let deviceTypes: [AVCaptureDevice.DeviceType] = switch self {
         case .backWide:
-            deviceTypes = [.builtInWideAngleCamera]
+            [.builtInWideAngleCamera]
         case .backUltraWide:
-            deviceTypes = [.builtInUltraWideCamera]
+            [.builtInUltraWideCamera]
         case .backTelephoto:
-            deviceTypes = [.builtInTelephotoCamera]
+            [.builtInTelephotoCamera]
         case .front:
-            deviceTypes = [.builtInWideAngleCamera]
+            [.builtInWideAngleCamera]
         }
         return AVCaptureDevice.default(deviceTypes.first!, for: .video, position: position)
     }
@@ -71,9 +70,9 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var sessionStartTime: CMTime?
     private var recordingDirectory: URL?
-    
+
     func makePreviewLayer() -> AVCaptureVideoPreviewLayer? {
-        return previewLayer
+        previewLayer
     }
 
     func startRecording(cameras: Set<CameraID>, directory: URL) -> Bool {
@@ -91,7 +90,7 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer?.videoGravity = .resizeAspectFill
         session.beginConfiguration()
-        
+
         for camera in limited {
             guard let device = camera.resolveDevice(), let input = try? AVCaptureDeviceInput(device: device) else { continue }
             if session.canAddInput(input) { session.addInput(input) }
@@ -109,7 +108,7 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         isRecording = true
         return true
     }
-    
+
     func stopRecording() {
         guard isRecording else { return }
         session?.stopRunning()
@@ -130,8 +129,8 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         sessionStartTime = nil
         recordingDirectory = nil
     }
-    
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from _: AVCaptureConnection) {
         guard let videoOutput = output as? AVCaptureVideoDataOutput,
               let cameraID = outputMap[videoOutput],
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
@@ -162,7 +161,7 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         }
         recorders[cameraID]?.append(pixelBuffer: pixelBuffer, timestamp: seconds)
     }
-    
+
     static func makeOutputURLs(for cameras: Set<CameraID>, in directory: URL) -> [CameraID: URL] {
         var dict: [CameraID: URL] = [:]
         for cam in cameras {
