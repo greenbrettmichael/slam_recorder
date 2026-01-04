@@ -32,6 +32,7 @@ class VideoCaptureController(private val context: Context) {
         surfaceProvider: Preview.SurfaceProvider?,
     ): Long =
         withContext(Dispatchers.Main) {
+            android.util.Log.i("VideoCaptureController", "Starting with preview surface provider: ${if (surfaceProvider != null) "READY" else "NULL"}")
             cameraProvider = ProcessCameraProvider.getInstance(context).await(mainExecutor)
             val provider = cameraProvider ?: error("Camera provider unavailable")
 
