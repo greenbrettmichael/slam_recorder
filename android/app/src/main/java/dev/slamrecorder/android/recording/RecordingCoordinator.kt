@@ -3,6 +3,8 @@ package dev.slamrecorder.android.recording
 import android.content.Context
 import android.hardware.SensorManager
 import android.net.Uri
+import android.os.SystemClock
+import android.view.Surface
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,7 @@ class RecordingCoordinator(
     private var videoCapture: VideoCaptureController? = null
     private var multiCameraCapture: MultiCameraCaptureController? = null
     private var previewSurfaceProvider: androidx.camera.core.Preview.SurfaceProvider? = null
+    private val multiPreviewSurfaces: MutableMap<String, Surface?> = mutableMapOf()
 
     sealed interface ExportResult {
         data class Success(val uri: Uri) : ExportResult
@@ -65,22 +68,27 @@ class RecordingCoordinator(
             }
 
             if (mode == RecordingMode.MULTI_CAMERA) {
-                // Multi-camera: record up to two cameras simultaneously (no preview for now)
+                // Multi-camera: record up to two cameras simultaneously
                 val ids = selectedCameraIds.take(2)
                 if (ids.isEmpty()) {
                     return@withContext Result(false, "No cameras selected")
                 }
                 val multi = MultiCameraCaptureController(context, cameraManager)
                 multiCameraCapture = multi
-                val camFiles = ids.map { id -> id to files.videoFileForCamera(id) }
+                val camFiles = ids.map { id ->
+                    MultiCameraCaptureController.CamSpec(
+                        cameraId = id,
+                        outputFile = files.videoFileForCamera(id),
+                        previewSurface = multiPreviewSurfaces[id],
+                    )
+                }
+                val sharedStart = SystemClock.elapsedRealtimeNanos()
                 val started = multi.start(camFiles)
                 if (!started) {
                     multi.stop()
                     return@withContext Result(false, "Failed to start multi-camera recording")
                 }
-                camFiles.forEach { (id, _) ->
-                    files.videoStartFileForCamera(id).writeText(System.nanoTime().toString())
-                }
+                files.videoStartFile.writeText(sharedStart.toString())
             } else {
                 videoCapture = VideoCaptureController(context)
                 val videoStartNanos = videoCapture?.start(files.videoFile, previewSurfaceProvider) ?: 0L
@@ -115,6 +123,10 @@ class RecordingCoordinator(
     fun updatePreviewSurfaceProvider(provider: androidx.camera.core.Preview.SurfaceProvider?) {
         android.util.Log.i("RecordingCoordinator", "Preview surface provider updated: ${if (provider != null) "READY" else "NULL"}")
         previewSurfaceProvider = provider
+    }
+
+    fun updateMultiPreviewSurface(cameraId: String, surface: Surface?) {
+        multiPreviewSurfaces[cameraId] = surface
     }
 
     suspend fun exportLatest(): ExportResult =

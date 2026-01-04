@@ -27,8 +27,8 @@ data class CameraOption(
 }
 
 /** Enumerates available cameras and exposes logical/physical relationships. */
-class CameraEnumerator(private val cameraManager: CameraManager) {
-    fun listCameraOptions(): List<CameraOption> {
+open class CameraEnumerator(private val cameraManager: CameraManager) {
+    open fun listCameraOptions(): List<CameraOption> {
         return cameraManager.cameraIdList.mapNotNull { id ->
             val chars = runCatching { cameraManager.getCameraCharacteristics(id) }.getOrNull() ?: return@mapNotNull null
             val facing = chars.get(CameraCharacteristics.LENS_FACING)

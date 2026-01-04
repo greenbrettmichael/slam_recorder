@@ -36,6 +36,7 @@ class MultiCamSupportCheckerTest {
         val viewModel =
             RecordingViewModel(
                 FakeSupportChecker(supported = false),
+                FakeCameraEnumerator(),
                 coordinator = null,
             )
 
@@ -50,6 +51,7 @@ class MultiCamSupportCheckerTest {
         val viewModel =
             RecordingViewModel(
                 FakeSupportChecker(supported = true),
+                FakeCameraEnumerator(),
                 coordinator = null,
             )
 
@@ -58,10 +60,4 @@ class MultiCamSupportCheckerTest {
         assertEquals(RecordingMode.MULTI_CAMERA, viewModel.uiState.value.selectedMode)
         assertTrue(viewModel.uiState.value.multiCamSupported)
     }
-}
-
-private class FakeSupportChecker(
-    private val supported: Boolean,
-) : MultiCamSupportChecker(mockk<CameraManager>(relaxed = true)) {
-    override fun isSupported(): Boolean = supported
 }

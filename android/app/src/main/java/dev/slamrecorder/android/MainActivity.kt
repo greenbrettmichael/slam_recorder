@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
                     onToggleRecording = viewModel::toggleRecording,
                     onExportLatest = { exportLatestSession(recordingCoordinator) },
                     onPreviewReady = viewModel::setPreviewSurfaceProvider,
+                    onMultiPreviewSurface = viewModel::setMultiPreviewSurface,
                 )
             }
         }

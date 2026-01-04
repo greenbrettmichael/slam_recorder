@@ -3,20 +3,29 @@ package dev.slamrecorder.android.ui
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -32,11 +41,15 @@ fun recorderScreen(
     onToggleRecording: () -> Unit,
     onExportLatest: () -> Unit = {},
     onPreviewReady: (androidx.camera.core.Preview.SurfaceProvider) -> Unit = {},
+    onMultiPreviewSurface: (String, android.view.Surface?) -> Unit = { _, _ -> },
 ) {
+    var showModeEditor by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -55,16 +68,37 @@ fun recorderScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = "Recording Mode",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                modeSelector(
-                    selectedMode = state.selectedMode,
-                    multiCamSupported = state.multiCamSupported,
-                    onModeSelected = onModeSelected,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Recording Mode",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        if (!showModeEditor) {
+                            Text(
+                                text = state.selectedMode.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    TextButton(onClick = { showModeEditor = !showModeEditor }) {
+                        Text(if (showModeEditor) "Done" else "Change")
+                    }
+                }
+
+                if (showModeEditor) {
+                    modeSelector(
+                        selectedMode = state.selectedMode,
+                        multiCamSupported = state.multiCamSupported,
+                        onModeSelected = onModeSelected,
+                    )
+                }
+
                 val supportMessage = state.supportMessage
                 if (supportMessage.isNotBlank()) {
                     Text(
@@ -87,15 +121,13 @@ fun recorderScreen(
             ) {
                 if (state.selectedMode == RecordingMode.MULTI_CAMERA) {
                     Text(
-                        text = "Multi-camera preview not shown; select up to 2 cameras below.",
+                        text = "Multi-camera: select up to 2 cameras and preview below.",
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    cameraSelectorList(state, onCameraToggle)
+                    multiCameraPreviews(state, onMultiPreviewSurface)
                 } else {
                     cameraPreview(onPreviewReady = onPreviewReady)
-                }
-
-                if (state.selectedMode == RecordingMode.MULTI_CAMERA) {
-                    cameraSelectorList(state, onCameraToggle)
                 }
 
                 Text(
@@ -173,6 +205,50 @@ private fun cameraSelectorList(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+    }
+}
+
+@Composable
+private fun multiCameraPreviews(
+    state: RecorderUiState,
+    onSurfaceReady: (String, android.view.Surface?) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        state.selectedCameraIds.take(2).forEach { camId ->
+            AndroidView(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                factory = { context ->
+                    android.view.TextureView(context).apply {
+                        surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(
+                                surfaceTexture: android.graphics.SurfaceTexture,
+                                width: Int,
+                                height: Int,
+                            ) {
+                                onSurfaceReady(camId, android.view.Surface(surfaceTexture))
+                            }
+
+                            override fun onSurfaceTextureSizeChanged(
+                                surfaceTexture: android.graphics.SurfaceTexture,
+                                width: Int,
+                                height: Int,
+                            ) = Unit
+
+                            override fun onSurfaceTextureDestroyed(surfaceTexture: android.graphics.SurfaceTexture): Boolean {
+                                onSurfaceReady(camId, null)
+                                return true
+                            }
+
+                            override fun onSurfaceTextureUpdated(surfaceTexture: android.graphics.SurfaceTexture) = Unit
+                        }
+                    }
+                },
+            )
+            Text(text = "Preview: $camId", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

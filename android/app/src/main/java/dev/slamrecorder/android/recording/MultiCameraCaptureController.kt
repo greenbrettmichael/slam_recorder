@@ -32,7 +32,13 @@ class MultiCameraCaptureController(
     private val captureSessions = mutableListOf<CameraCaptureSession>()
     private val recorders = mutableListOf<MediaRecorder>()
 
-    suspend fun start(cameras: List<Pair<String, File>>): Boolean {
+    data class CamSpec(
+        val cameraId: String,
+        val outputFile: File,
+        val previewSurface: Surface? = null,
+    )
+
+    suspend fun start(cameras: List<CamSpec>): Boolean {
         if (cameras.isEmpty()) return false
         if (cameras.size > 2) error("Only up to 2 cameras supported")
         return withContext(Dispatchers.IO) {
@@ -40,18 +46,23 @@ class MultiCameraCaptureController(
             handlerThread.start()
             val handler = Handler(handlerThread.looper)
             try {
-                for ((cameraId, outputFile) in cameras) {
-                    val recorder = createRecorder(outputFile)
+                for (spec in cameras) {
+                    val recorder = createRecorder(spec.outputFile)
                     val recorderSurface = recorder.surface
 
-                    val camera = openCamera(cameraId, handler)
+                    val camera = openCamera(spec.cameraId, handler)
                     cameraDevices += camera
 
-                    val session = createSession(camera, listOf(recorderSurface), handler)
+                    val surfaces = buildList {
+                        add(recorderSurface)
+                        spec.previewSurface?.let { add(it) }
+                    }
+                    val session = createSession(camera, surfaces, handler)
                     captureSessions += session
 
                     val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
                         addTarget(recorderSurface)
+                        spec.previewSurface?.let { addTarget(it) }
                     }.build()
                     session.setRepeatingRequest(request, null, handler)
 

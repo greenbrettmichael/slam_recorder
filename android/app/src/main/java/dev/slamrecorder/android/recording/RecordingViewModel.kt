@@ -1,5 +1,6 @@
 package dev.slamrecorder.android.recording
 
+import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,10 @@ class RecordingViewModel(
 
     fun setPreviewSurfaceProvider(provider: androidx.camera.core.Preview.SurfaceProvider?) {
         coordinator?.updatePreviewSurfaceProvider(provider)
+    }
+
+    fun setMultiPreviewSurface(cameraId: String, surface: android.view.Surface?) {
+        coordinator?.updateMultiPreviewSurface(cameraId, surface)
     }
 
     fun selectMode(mode: RecordingMode) {
