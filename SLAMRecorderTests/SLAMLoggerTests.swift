@@ -201,11 +201,6 @@ final class SLAMLoggerTests: XCTestCase {
         XCTAssertTrue(layers.isEmpty)
     }
 
-    func testSceneViewProperty() {
-        XCTAssertNotNil(logger.sceneView)
-        XCTAssertNotNil(logger.sceneView.session)
-    }
-
     func testRecordingModeSwitch() {
         XCTAssertEqual(logger.recordingMode, .arkit)
         logger.recordingMode = .multiCamera

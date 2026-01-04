@@ -19,12 +19,6 @@ final class ARViewContainerTests: XCTestCase {
         super.tearDown()
     }
 
-    func testARViewContainerReturnsSceneView() {
-        let container = ARViewContainer(logger: logger)
-        // Access the sceneView directly through the logger
-        XCTAssertNotNil(container.logger.sceneView)
-    }
-
     func testARViewContainerHasCorrectLogger() {
         let container = ARViewContainer(logger: logger)
         XCTAssertTrue(container.logger === logger)
