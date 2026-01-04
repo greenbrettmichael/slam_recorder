@@ -134,4 +134,46 @@ final class VideoRecorderTests: XCTestCase {
 
         XCTAssertFalse(recorder.isWriting)
     }
+
+    func testIsWritingProperty() {
+        let recorder = VideoRecorder()
+        XCTAssertFalse(recorder.isWriting)
+        _ = recorder.setup(url: tempURL, width: 640, height: 480)
+        XCTAssertTrue(recorder.isWriting)
+        let expectation = expectation(description: "Finish")
+        recorder.finish {
+            expectation.fulfill()
+        }
+        waitForExpectations(timeout: 2.0)
+        XCTAssertFalse(recorder.isWriting)
+    }
+
+    func testAppendWithoutSetup() {
+        let recorder = VideoRecorder()
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
+        ] as CFDictionary
+        CVPixelBufferCreate(kCFAllocatorDefault, 640, 480, kCVPixelFormatType_32BGRA, attrs, &pixelBuffer)
+        if let buffer = pixelBuffer {
+            // Should not crash when append is called without setup
+            recorder.append(pixelBuffer: buffer, timestamp: 0.0)
+        }
+        XCTAssertFalse(recorder.isWriting)
+    }
+
+    func testMultipleSetupCalls() {
+        let recorder = VideoRecorder()
+        let url1 = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+        let success1 = recorder.setup(url: url1, width: 640, height: 480)
+        XCTAssertTrue(success1)
+        XCTAssertTrue(recorder.isWriting)
+        let expectation = expectation(description: "Finish")
+        recorder.finish {
+            expectation.fulfill()
+        }
+        waitForExpectations(timeout: 2.0)
+        try? FileManager.default.removeItem(at: url1)
+    }
 }

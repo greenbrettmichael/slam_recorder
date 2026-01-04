@@ -61,4 +61,29 @@ final class MultiCamRecorderTests: XCTestCase {
         XCTAssertEqual(CameraID.backTelephoto.displayName, "Back Telephoto")
         XCTAssertEqual(CameraID.front.displayName, "Front")
     }
+
+    func testCameraIDPositions() {
+        XCTAssertEqual(CameraID.backWide.position, .back)
+        XCTAssertEqual(CameraID.backUltraWide.position, .back)
+        XCTAssertEqual(CameraID.backTelephoto.position, .back)
+        XCTAssertEqual(CameraID.front.position, .front)
+    }
+
+    func testCameraIDResolveDevice() {
+        // Test that resolveDevice returns a device (may be nil on simulator)
+        // This at least tests the method is callable
+        _ = CameraID.backWide.resolveDevice()
+        _ = CameraID.front.resolveDevice()
+        _ = CameraID.backUltraWide.resolveDevice()
+        _ = CameraID.backTelephoto.resolveDevice()
+    }
+
+    func testCameraIDAllCases() {
+        let allCases = CameraID.allCases
+        XCTAssertEqual(allCases.count, 4)
+        XCTAssertTrue(allCases.contains(.backWide))
+        XCTAssertTrue(allCases.contains(.backUltraWide))
+        XCTAssertTrue(allCases.contains(.backTelephoto))
+        XCTAssertTrue(allCases.contains(.front))
+    }
 }

@@ -65,12 +65,48 @@ jobs:
       - name: Generate Project
         run: xcodegen generate
 
-      - name: Build and Test
+      - name: Build and Test with Coverage
         run: |
           xcrun simctl boot "iPhone SE (3rd generation)" &
           xcodebuild test \
             -project SLAMRecorder.xcodeproj \
             -scheme SLAMRecorder \
             -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)' \
+            -enableCodeCoverage YES \
+            -derivedDataPath ./DerivedData \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
+
+      - name: Generate Coverage Report
+        if: always()
+        run: |
+          bash scripts/coverage.sh ./DerivedData/Logs/Test/*.xcresult
+          
+      - name: Add Coverage to Summary
+        if: always()
+        run: |
+          echo "## 📊 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Coverage: ${{ env.COVERAGE }}%**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Coverage by Target" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          head -20 coverage_report.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Key Files" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -A 1 "CSVWriter\|VideoRecorder\|SLAMLogger\|MultiCamRecorder\|RecordingMode" coverage_report.txt | head -30 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 Full coverage report available in artifacts"  >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Coverage Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.json
+            coverage_report.txt
+            ./DerivedData/Logs/Test/*.xcresult

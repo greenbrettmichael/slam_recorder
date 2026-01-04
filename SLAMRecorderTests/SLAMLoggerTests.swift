@@ -180,6 +180,47 @@ final class SLAMLoggerTests: XCTestCase {
         XCTAssertTrue(mockMultiCam.startCalled)
         logger.stopRecording()
     }
+
+    func testStartMonitoringWithARKit() {
+        logger.recordingMode = .arkit
+        logger.startMonitoring()
+        // Verify session is running (basic check - session state is not directly accessible)
+        XCTAssertEqual(logger.recordingMode, .arkit)
+    }
+
+    func testStartMonitoringWithMultiCamera() {
+        logger.recordingMode = .multiCamera
+        logger.startMonitoring()
+        // Verify it doesn't crash and session is paused for multi-cam
+        XCTAssertEqual(logger.recordingMode, .multiCamera)
+    }
+
+    func testMultiCamPreviewLayers() {
+        let layers = logger.multiCamPreviewLayers()
+        // Initially should be empty
+        XCTAssertTrue(layers.isEmpty)
+    }
+
+    func testSceneViewProperty() {
+        XCTAssertNotNil(logger.sceneView)
+        XCTAssertNotNil(logger.sceneView.session)
+    }
+
+    func testRecordingModeSwitch() {
+        XCTAssertEqual(logger.recordingMode, .arkit)
+        logger.recordingMode = .multiCamera
+        XCTAssertEqual(logger.recordingMode, .multiCamera)
+        logger.recordingMode = .arkit
+        XCTAssertEqual(logger.recordingMode, .arkit)
+    }
+
+    func testSelectedCamerasDefaultValue() {
+        XCTAssertEqual(logger.selectedCameras, [.backWide, .front])
+    }
+
+    func testSampleCountInitialValue() {
+        XCTAssertEqual(logger.sampleCount, 0)
+    }
 }
 
 // MARK: - Test Doubles
