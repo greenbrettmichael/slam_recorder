@@ -53,7 +53,6 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         super.init()
         // Configure the session hosted by the view
         sceneView.session.delegate = self
-        sceneView.showsStatistics = true
     }
 
     // MARK: - Public Methods
