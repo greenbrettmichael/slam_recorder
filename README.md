@@ -7,6 +7,7 @@ An iOS application for recording SLAM (Simultaneous Localization and Mapping) re
 SLAM Recorder captures high-frequency sensor data from iOS devices to support SLAM algorithm development and testing:
 
 - **ARKit Data**: 6DOF camera poses with transform matrices at 30-60 Hz
+- **Camera Intrinsics**: Per-frame focal length, principal point, exposure, and distortion parameters
 - **IMU Data**: Accelerometer, gyroscope, and attitude filter (quaternions) at 200 Hz
 - **Video Recording**: Synchronized H.264 video stream with pixel-aligned timestamps
 - **Multi-Camera Mode**: Dual-camera recording support (back wide + front cameras)
@@ -95,8 +96,18 @@ Recorded sessions are saved to the app's Documents directory with timestamped fo
 session_2026-01-03_15-30-45-123/
 ├── imu_data.csv              # IMU measurements (timestamp, accel, gyro, attitude quaternion)
 ├── arkit_groundtruth.csv     # AR poses (timestamp, position, quaternion)
+├── camera_intrinsics.csv     # Per-frame camera calibration (fx, fy, cx, cy, distortion, exposure, ISO)
 ├── video.mov                 # H.264 video stream
 └── video_start_time.txt      # Video offset for synchronization
+
+# Multi-camera mode produces:
+session_*/
+├── imu_data.csv
+├── camera_back_wide.mov
+├── camera_back_wide_intrinsics.csv
+├── camera_front.mov
+├── camera_front_intrinsics.csv
+└── video_start_time.txt
 ```
 
 ### 5. Exporting Data

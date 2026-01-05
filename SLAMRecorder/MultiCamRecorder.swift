@@ -64,6 +64,8 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
     private var session: AVCaptureMultiCamSession?
     private var outputMap: [AVCaptureVideoDataOutput: CameraID] = [:]
     private var recorders: [CameraID: VideoRecorder] = [:]
+    private var intrinsicsWriters: [CameraID: CSVWriter] = [:]
+    private var deviceMap: [CameraID: AVCaptureDevice] = [:]
     private var outputURLs: [CameraID: URL] = [:]
     private let queue = DispatchQueue(label: "multicam.capture.queue")
     private(set) var isRecording: Bool = false
@@ -92,7 +94,13 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
 
         for camera in limited {
             guard let device = camera.resolveDevice(), let input = try? AVCaptureDeviceInput(device: device) else { continue }
+            deviceMap[camera] = device
             if session.canAddInput(input) { session.addInput(input) }
+            
+            // Create intrinsics CSV writer for this camera
+            let intrinsicsURL = directory.appendingPathComponent("camera_\(camera.fileNameComponent)_intrinsics.csv")
+            let intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,iso,k1,k2,k3,p1,p2\n")
+            intrinsicsWriters[camera] = intrinsicsWriter
 
             // Create individual preview layer for this camera
             let previewLayer = AVCaptureVideoPreviewLayer(sessionWithNoConnection: session)
@@ -132,7 +140,12 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
             }
         }
         group.wait()
+        for writer in intrinsicsWriters.values {
+            writer.close()
+        }
         recorders.removeAll()
+        intrinsicsWriters.removeAll()
+        deviceMap.removeAll()
         outputMap.removeAll()
         outputURLs.removeAll()
         previewLayers.removeAll()
@@ -170,6 +183,48 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
             }
         }
         recorders[cameraID]?.append(pixelBuffer: pixelBuffer, timestamp: seconds)
+        
+        // Record camera intrinsics
+        if let device = deviceMap[cameraID] {
+            recordIntrinsics(for: cameraID, device: device, pixelBuffer: pixelBuffer, timestamp: seconds)
+        }
+    }
+    
+    private func recordIntrinsics(for cameraID: CameraID, device: AVCaptureDevice, pixelBuffer: CVPixelBuffer, timestamp: Double) {
+        guard let writer = intrinsicsWriters[cameraID] else { return }
+        
+        let width = Float(CVPixelBufferGetWidth(pixelBuffer))
+        let height = Float(CVPixelBufferGetHeight(pixelBuffer))
+        
+        // Calculate focal length in pixels from device field of view
+        let fovRadians = device.activeFormat.videoFieldOfView * .pi / 180.0
+        let focalLengthPixels = Float(width) / (2.0 * tan(fovRadians / 2.0))
+        let fx = focalLengthPixels
+        let fy = focalLengthPixels
+        
+        // Principal point (optical center) - typically at image center
+        let cx = width / 2.0
+        let cy = height / 2.0
+        
+        // Exposure duration in seconds
+        let exposureDuration = Float(CMTimeGetSeconds(device.exposureDuration))
+        
+        // ISO from device
+        let iso = device.iso
+        
+        // Distortion coefficients - AVFoundation doesn't expose these directly
+        // Most modern iPhones apply lens correction, so these are typically zero
+        let k1: Float = 0.0, k2: Float = 0.0, k3: Float = 0.0, p1: Float = 0.0, p2: Float = 0.0
+        
+        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+                                     timestamp,
+                                     fx, fy, cx, cy,
+                                     width, height,
+                                     exposureDuration,
+                                     iso,
+                                     k1, k2, k3, p1, p2)
+        
+        writer.write(row: intrinsicsLine)
     }
 
     static func makeOutputURLs(for cameras: Set<CameraID>, in directory: URL) -> [CameraID: URL] {

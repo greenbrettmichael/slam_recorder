@@ -35,6 +35,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
     // Helpers
     private var imuWriter: CSVWriter?
     private var poseWriter: CSVWriter?
+    private var intrinsicsWriter: CSVWriter?
     private let videoRecorder = VideoRecorder()
     private let multiCamRecorder: MultiCamRecording
 
@@ -139,8 +140,10 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         // Close CSVs
         imuWriter?.close()
         poseWriter?.close()
+        intrinsicsWriter?.close()
         imuWriter = nil
         poseWriter = nil
+        intrinsicsWriter = nil
 
         switch recordingMode {
         case .arkit:
@@ -183,11 +186,15 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
             if recordingMode == .arkit {
                 let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
                 poseWriter = CSVWriter(url: poseURL, header: "timestamp,tx,ty,tz,qx,qy,qz,qw\n")
+                
+                let intrinsicsURL = sessionDir.appendingPathComponent("camera_intrinsics.csv")
+                intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,exposure_offset,iso,k1,k2,k3,p1,p2\n")
             } else {
                 poseWriter = nil
+                intrinsicsWriter = nil
             }
 
-            return imuWriter != nil && (recordingMode == .multiCamera || poseWriter != nil)
+            return imuWriter != nil && (recordingMode == .multiCamera || (poseWriter != nil && intrinsicsWriter != nil))
         } catch {
             print("Error creating session directory: \(error)")
             return false
@@ -254,6 +261,39 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
         // CSV write is now buffered on background queue, so this is very fast
         poseWriter?.write(row: poseLine)
+        
+        // Log Camera Intrinsics for COLMAP and structure-from-motion pipelines
+        // Records per-frame calibration parameters including focal length, principal point,
+        // image dimensions, exposure settings, and distortion coefficients.
+        let intrinsics = frame.camera.intrinsics
+        let fx = intrinsics.columns.0.x
+        let fy = intrinsics.columns.1.y
+        let cx = intrinsics.columns.2.x
+        let cy = intrinsics.columns.2.y
+        let width = frame.camera.imageResolution.width
+        let height = frame.camera.imageResolution.height
+        let exposureDuration = frame.camera.exposureDuration
+        let exposureOffset = frame.camera.exposureOffset
+        
+        // Distortion coefficients (Brown-Conrady model: radial k1,k2,k3 and tangential p1,p2)
+        // Note: ARKit video frames are typically undistorted and ARKit doesn't expose
+        // Brown-Conrady coefficients directly. For COLMAP, use SIMPLE_PINHOLE or PINHOLE
+        // camera models with zero distortion coefficients.
+        let k1: Float = 0.0, k2: Float = 0.0, k3: Float = 0.0, p1: Float = 0.0, p2: Float = 0.0
+        
+        // ISO is not directly exposed by ARCamera - ARKit manages exposure automatically
+        // Using 0 as placeholder since ARKit doesn't provide ISO information
+        let iso: Float = 0.0  // Not available in ARKit
+        
+        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.9f,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+                                     frame.timestamp,
+                                     fx, fy, cx, cy,
+                                     width, height,
+                                     exposureDuration, exposureOffset,
+                                     iso,
+                                     k1, k2, k3, p1, p2)
+        
+        intrinsicsWriter?.write(row: intrinsicsLine)
 
         // Handle Video Recording (must be on main thread for pixel buffer handling)
         if !videoRecorder.isWriting {

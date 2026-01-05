@@ -263,6 +263,58 @@ final class SLAMLoggerTests: XCTestCase {
         
         logger.stopRecording()
     }
+    
+    func testCameraIntrinsicsCSVCreated() {
+        logger.recordingMode = .arkit
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+        
+        // Find the session directory
+        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: docDir, includingPropertiesForKeys: nil, options: [])
+            let sessionFolders = contents.filter { $0.lastPathComponent.starts(with: "session_") }
+            
+            guard let recentSession = sessionFolders.sorted(by: { $0.path > $1.path }).first else {
+                XCTFail("No session folder found")
+                logger.stopRecording()
+                return
+            }
+            
+            let intrinsicsPath = recentSession.appendingPathComponent("camera_intrinsics.csv")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: intrinsicsPath.path), "Camera intrinsics CSV should exist in ARKit mode")
+            
+            // Read the header
+            let csvContent = try String(contentsOf: intrinsicsPath, encoding: .utf8)
+            let lines = csvContent.components(separatedBy: .newlines)
+            XCTAssertFalse(lines.isEmpty, "CSV should have content")
+            
+            let header = lines[0]
+            let columns = header.components(separatedBy: ",")
+            
+            // Verify all expected columns are present
+            XCTAssertEqual(columns.count, 15, "Should have 15 columns")
+            XCTAssertEqual(columns[0], "timestamp")
+            XCTAssertEqual(columns[1], "fx")
+            XCTAssertEqual(columns[2], "fy")
+            XCTAssertEqual(columns[3], "cx")
+            XCTAssertEqual(columns[4], "cy")
+            XCTAssertEqual(columns[5], "width")
+            XCTAssertEqual(columns[6], "height")
+            XCTAssertEqual(columns[7], "exposure_duration")
+            XCTAssertEqual(columns[8], "exposure_offset")
+            XCTAssertEqual(columns[9], "iso")
+            XCTAssertEqual(columns[10], "k1")
+            XCTAssertEqual(columns[11], "k2")
+            XCTAssertEqual(columns[12], "k3")
+            XCTAssertEqual(columns[13], "p1")
+            XCTAssertEqual(columns[14], "p2")
+        } catch {
+            XCTFail("Failed to read camera intrinsics CSV: \(error)")
+        }
+        
+        logger.stopRecording()
+    }
 }
 
 // MARK: - Test Doubles
