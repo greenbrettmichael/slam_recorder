@@ -303,12 +303,6 @@ final class SLAMLoggerTests: XCTestCase {
             XCTAssertEqual(columns[6], "height")
             XCTAssertEqual(columns[7], "exposure_duration")
             XCTAssertEqual(columns[8], "exposure_offset")
-            XCTAssertEqual(columns[9], "iso")
-            XCTAssertEqual(columns[10], "k1")
-            XCTAssertEqual(columns[11], "k2")
-            XCTAssertEqual(columns[12], "k3")
-            XCTAssertEqual(columns[13], "p1")
-            XCTAssertEqual(columns[14], "p2")
         } catch {
             XCTFail("Failed to read camera intrinsics CSV: \(error)")
         }

@@ -188,7 +188,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
                 poseWriter = CSVWriter(url: poseURL, header: "timestamp,tx,ty,tz,qx,qy,qz,qw\n")
                 
                 let intrinsicsURL = sessionDir.appendingPathComponent("camera_intrinsics.csv")
-                intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,exposure_offset,iso,k1,k2,k3,p1,p2\n")
+                intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,exposure_offset\n")
             } else {
                 poseWriter = nil
                 intrinsicsWriter = nil
@@ -275,23 +275,11 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         let exposureDuration = frame.camera.exposureDuration
         let exposureOffset = frame.camera.exposureOffset
         
-        // Distortion coefficients (Brown-Conrady model: radial k1,k2,k3 and tangential p1,p2)
-        // Note: ARKit video frames are typically undistorted and ARKit doesn't expose
-        // Brown-Conrady coefficients directly. For COLMAP, use SIMPLE_PINHOLE or PINHOLE
-        // camera models with zero distortion coefficients.
-        let k1: Float = 0.0, k2: Float = 0.0, k3: Float = 0.0, p1: Float = 0.0, p2: Float = 0.0
-        
-        // ISO is not directly exposed by ARCamera - ARKit manages exposure automatically
-        // Using 0 as placeholder since ARKit doesn't provide ISO information
-        let iso: Float = 0.0  // Not available in ARKit
-        
-        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.9f,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.9f\n",
                                      frame.timestamp,
                                      fx, fy, cx, cy,
                                      width, height,
-                                     exposureDuration, exposureOffset,
-                                     iso,
-                                     k1, k2, k3, p1, p2)
+                                     exposureDuration, exposureOffset)
         
         intrinsicsWriter?.write(row: intrinsicsLine)
 

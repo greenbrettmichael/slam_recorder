@@ -94,12 +94,16 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
 
         for camera in limited {
             guard let device = camera.resolveDevice(), let input = try? AVCaptureDeviceInput(device: device) else { continue }
+            
+            // Configure device format to 1920x1440 if available
+            configureDeviceFormat(device, targetWidth: 1920, targetHeight: 1440)
+            
             deviceMap[camera] = device
             if session.canAddInput(input) { session.addInput(input) }
             
             // Create intrinsics CSV writer for this camera
             let intrinsicsURL = directory.appendingPathComponent("camera_\(camera.fileNameComponent)_intrinsics.csv")
-            let intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,iso,k1,k2,k3,p1,p2\n")
+            let intrinsicsWriter = CSVWriter(url: intrinsicsURL, header: "timestamp,fx,fy,cx,cy,width,height,exposure_duration,iso\n")
             intrinsicsWriters[camera] = intrinsicsWriter
 
             // Create individual preview layer for this camera
@@ -212,19 +216,54 @@ final class MultiCamRecorder: NSObject, MultiCamRecording, AVCaptureVideoDataOut
         // ISO from device
         let iso = device.iso
         
-        // Distortion coefficients - AVFoundation doesn't expose these directly
-        // Most modern iPhones apply lens correction, so these are typically zero
-        let k1: Float = 0.0, k2: Float = 0.0, k3: Float = 0.0, p1: Float = 0.0, p2: Float = 0.0
-        
-        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.1f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+        let intrinsicsLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%.9f,%.1f\n",
                                      timestamp,
                                      fx, fy, cx, cy,
                                      width, height,
                                      exposureDuration,
-                                     iso,
-                                     k1, k2, k3, p1, p2)
+                                     iso)
         
         writer.write(row: intrinsicsLine)
+    }
+    
+    private func configureDeviceFormat(_ device: AVCaptureDevice, targetWidth: Int, targetHeight: Int) {
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            
+            // Find the best format matching the target resolution
+            var bestFormat: AVCaptureDevice.Format?
+            var bestDifference = Int.max
+            
+            for format in device.formats {
+                let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let width = Int(dimensions.width)
+                let height = Int(dimensions.height)
+                
+                // Calculate how close this format is to our target
+                let widthDiff = abs(width - targetWidth)
+                let heightDiff = abs(height - targetHeight)
+                let totalDiff = widthDiff + heightDiff
+                
+                // Prefer exact match or closest match
+                if totalDiff < bestDifference {
+                    bestDifference = totalDiff
+                    bestFormat = format
+                }
+            }
+            
+            if let format = bestFormat {
+                device.activeFormat = format
+                // Set frame rate to max supported for the format
+                if let frameRateRange = format.videoSupportedFrameRateRanges.first {
+                    let maxFrameRate = frameRateRange.maxFrameRate
+                    device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: CMTimeScale(maxFrameRate))
+                    device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: CMTimeScale(maxFrameRate))
+                }
+            }
+        } catch {
+            print("Failed to configure device format: \(error)")
+        }
     }
 
     static func makeOutputURLs(for cameras: Set<CameraID>, in directory: URL) -> [CameraID: URL] {
