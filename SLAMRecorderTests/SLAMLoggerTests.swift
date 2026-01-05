@@ -216,6 +216,53 @@ final class SLAMLoggerTests: XCTestCase {
     func testSampleCountInitialValue() {
         XCTAssertEqual(logger.sampleCount, 0)
     }
+
+    func testIMUCSVContainsAttitudeColumns() {
+        logger.startRecording()
+        XCTAssertTrue(logger.isRecording)
+
+        // Find the session directory
+        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: docDir, includingPropertiesForKeys: nil, options: [])
+            let sessionFolders = contents.filter { $0.lastPathComponent.starts(with: "session_") }
+            
+            guard let recentSession = sessionFolders.sorted(by: { $0.path > $1.path }).first else {
+                XCTFail("No session folder found")
+                logger.stopRecording()
+                return
+            }
+            
+            let imuPath = recentSession.appendingPathComponent("imu_data.csv")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: imuPath.path), "IMU CSV should exist")
+            
+            // Read the header
+            let csvContent = try String(contentsOf: imuPath, encoding: .utf8)
+            let lines = csvContent.components(separatedBy: .newlines)
+            XCTAssertFalse(lines.isEmpty, "CSV should have content")
+            
+            let header = lines[0]
+            let columns = header.components(separatedBy: ",")
+            
+            // Verify all expected columns are present
+            XCTAssertEqual(columns.count, 11, "Should have 11 columns: timestamp, acc(3), gyro(3), att_quat(4)")
+            XCTAssertEqual(columns[0], "timestamp")
+            XCTAssertEqual(columns[1], "acc_x")
+            XCTAssertEqual(columns[2], "acc_y")
+            XCTAssertEqual(columns[3], "acc_z")
+            XCTAssertEqual(columns[4], "gyro_x")
+            XCTAssertEqual(columns[5], "gyro_y")
+            XCTAssertEqual(columns[6], "gyro_z")
+            XCTAssertEqual(columns[7], "att_qx")
+            XCTAssertEqual(columns[8], "att_qy")
+            XCTAssertEqual(columns[9], "att_qz")
+            XCTAssertEqual(columns[10], "att_qw")
+        } catch {
+            XCTFail("Failed to read IMU CSV: \(error)")
+        }
+        
+        logger.stopRecording()
+    }
 }
 
 // MARK: - Test Doubles

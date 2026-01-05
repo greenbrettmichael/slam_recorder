@@ -178,7 +178,7 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
             // Setup CSV Writers
             let imuURL = sessionDir.appendingPathComponent("imu_data.csv")
-            imuWriter = CSVWriter(url: imuURL, header: "timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\n")
+            imuWriter = CSVWriter(url: imuURL, header: "timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,att_qx,att_qy,att_qz,att_qw\n")
 
             if recordingMode == .arkit {
                 let poseURL = sessionDir.appendingPathComponent("arkit_groundtruth.csv")
@@ -196,9 +196,9 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
 
     /// Starts the IMU data capture.
     ///
-    /// Configures the device motion manager to capture accelerometer and gyroscope data at 200Hz.
+    /// Configures the device motion manager to capture accelerometer, gyroscope, and attitude filter data at 200Hz.
     /// Data is written to the CSV file via the buffered background queue, minimizing main thread impact.
-    /// Total acceleration (user acceleration + gravity) is captured for complete inertial measurements.
+    /// Total acceleration (user acceleration + gravity) and attitude quaternions from the device motion filter are captured.
     private func startIMU() {
         guard motionManager.isDeviceMotionAvailable else { return }
         motionManager.deviceMotionUpdateInterval = 1.0 / 200.0
@@ -206,14 +206,18 @@ class SLAMLogger: NSObject, ObservableObject, ARSessionDelegate {
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data, isRecording else { return }
 
-            let csvLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+            let csvLine = String(format: "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                                  data.timestamp,
                                  data.userAcceleration.x + data.gravity.x,
                                  data.userAcceleration.y + data.gravity.y,
                                  data.userAcceleration.z + data.gravity.z,
                                  data.rotationRate.x,
                                  data.rotationRate.y,
-                                 data.rotationRate.z)
+                                 data.rotationRate.z,
+                                 data.attitude.quaternion.x,
+                                 data.attitude.quaternion.y,
+                                 data.attitude.quaternion.z,
+                                 data.attitude.quaternion.w)
 
             imuWriter?.write(row: csvLine)
         }
